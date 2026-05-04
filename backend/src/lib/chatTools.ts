@@ -21,6 +21,8 @@ import {
     type LlmMessage,
     type OpenAIToolSchema,
 } from "./llm";
+import { findMcpServerForTool } from "./mcp/servers";
+import type { LoadedMcpServer } from "./mcp/types";
 
 const STANDARD_FONT_DATA_URL = (() => {
     try {
@@ -1495,6 +1497,7 @@ export async function runToolCalls(
     docIndex?: DocIndex,
     turnEditState?: TurnEditState,
     projectId?: string | null,
+    mcpServers?: LoadedMcpServer[],
 ): Promise<{
     toolResults: unknown[];
     docsRead: { filename: string; document_id?: string }[];
@@ -1522,6 +1525,33 @@ export async function runToolCalls(
             args = JSON.parse(tc.function.arguments || "{}");
         } catch {
             /* ignore */
+        }
+
+        if (tc.function.name.startsWith("mcp__") && mcpServers?.length) {
+            const match = findMcpServerForTool(tc.function.name, mcpServers);
+            if (!match) {
+                toolResults.push({
+                    role: "tool",
+                    tool_call_id: tc.id,
+                    content: `MCP tool '${tc.function.name}' not available (server may have been removed mid-request).`,
+                });
+                continue;
+            }
+            const { server, originalName } = match;
+            write(
+                `data: ${JSON.stringify({
+                    type: "mcp_tool_call",
+                    server: server.row.name,
+                    tool: originalName,
+                })}\n\n`,
+            );
+            const content = await server.client.callTool(originalName, args);
+            toolResults.push({
+                role: "tool",
+                tool_call_id: tc.id,
+                content,
+            });
+            continue;
         }
 
         if (tc.function.name === "read_document") {
@@ -2312,11 +2342,22 @@ export async function runLLMStream(params: {
      * generated docs still get persisted, but as standalone documents.
      */
     projectId?: string | null;
+    /**
+     * MCP servers loaded for this user (already connected, with tool lists
+     * fetched). Their tools are merged into the per-request tool set under
+     * the `mcp__<slug>__` prefix. Leave undefined when no MCP support is
+     * wired in or the user has none configured.
+     */
+    mcpServers?: LoadedMcpServer[];
 }): Promise<{ fullText: string; events: AssistantEvent[] }> {
-    const { apiMessages, docStore, docIndex, userId, db, write, extraTools, workflowStore, tabularStore, buildCitations, model, apiKeys, projectId } = params;
-    const activeTools = extraTools?.length
-        ? [...TOOLS, ...WORKFLOW_TOOLS, ...extraTools]
-        : [...TOOLS, ...WORKFLOW_TOOLS];
+    const { apiMessages, docStore, docIndex, userId, db, write, extraTools, workflowStore, tabularStore, buildCitations, model, apiKeys, projectId, mcpServers } = params;
+    const mcpTools = (mcpServers ?? []).flatMap((s) => s.tools);
+    const activeTools = [
+        ...TOOLS,
+        ...WORKFLOW_TOOLS,
+        ...(extraTools ?? []),
+        ...mcpTools,
+    ];
 
     // Extract system prompt; pass remaining turns to the adapter as
     // plain user/assistant messages.
@@ -2483,6 +2524,7 @@ export async function runLLMStream(params: {
                     docIndex,
                     turnEditState,
                     projectId,
+                    mcpServers,
                 );
             for (const r of docsRead) {
                 events.push({
