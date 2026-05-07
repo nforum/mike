@@ -2,6 +2,7 @@ node_modules
 .next
 .env
 .env.*
+!.env.production
 !.env.local.example
 *.log
 .git

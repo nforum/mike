@@ -16,9 +16,22 @@ import { mcpOauthRouter } from "./routes/mcpOauth";
 const app = express();
 const PORT = process.env.PORT ?? 3001;
 
+const ALLOWED_ORIGINS = [
+  "http://localhost:3000",
+  "https://mike-frontend-516192556389.europe-west1.run.app",
+  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+];
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL ?? "http://localhost:3000",
+    origin(origin, callback) {
+      // allow server-to-server (no origin) and listed origins
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+        callback(null, origin ?? true);
+      } else {
+        callback(null, false);
+      }
+    },
     credentials: true,
   }),
 );
