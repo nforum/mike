@@ -12,7 +12,7 @@ export function getModelProvider(modelId: string): ModelProvider | null {
     const model = MODELS.find((m) => m.id === modelId);
     if (!model) return null;
     if (model.group === "Anthropic") return "claude";
-    if (model.group === "OpenAI") return "openai";
+    if (model.group === "OpenAI" || model.group === "LocalLLM") return "openai";
     return "gemini";
 }
 
@@ -22,6 +22,9 @@ export function isModelAvailable(
 ): boolean {
     const provider = getModelProvider(modelId);
     if (!provider) return false;
+    // LocalLLM models are server-configured, always available
+    const model = MODELS.find((m) => m.id === modelId);
+    if (model?.group === "LocalLLM") return true;
     if (provider === "claude") return !!apiKeys.claudeApiKey?.trim();
     if (provider === "openai") return !!apiKeys.openaiApiKey?.trim();
     return !!apiKeys.geminiApiKey?.trim();
@@ -46,6 +49,6 @@ export function modelGroupToProvider(
     group: ModelOption["group"],
 ): ModelProvider {
     if (group === "Anthropic") return "claude";
-    if (group === "OpenAI") return "openai";
+    if (group === "OpenAI" || group === "LocalLLM") return "openai";
     return "gemini";
 }
