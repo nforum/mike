@@ -160,7 +160,7 @@ mcpServersRouter.post("/", requireAuth, async (req, res) => {
         .select("id, slug, name, url, headers, enabled, last_error, auth_type, oauth_tokens, created_at, updated_at")
         .single();
     if (error) {
-        const status = error.code === "23505" ? 409 : 500;
+        const status = (error as { code?: string }).code === "23505" ? 409 : 500;
         return void res.status(status).json({ detail: error.message });
     }
     res.json(publicShape(data));

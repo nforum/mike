@@ -314,7 +314,7 @@ tabularRouter.get("/:reviewId", requireAuth, async (req, res) => {
         .from("tabular_cells")
         .select("*")
         .eq("review_id", reviewId);
-    const docIds = [...new Set((cells ?? []).map((c) => c.document_id))];
+    const docIds = [...new Set((cells ?? []).map((c: Record<string, unknown>) => c.document_id as string))];
     const docsResult =
         docIds.length > 0
             ? await db.from("documents").select("*").in("id", docIds)
@@ -328,7 +328,7 @@ tabularRouter.get("/:reviewId", requireAuth, async (req, res) => {
 
     res.json({
         review: { ...review, is_owner: access.isOwner },
-        cells: (cells ?? []).map((cell) => ({
+        cells: (cells ?? []).map((cell: Record<string, unknown>) => ({
             ...cell,
             content: parseCellContent(cell.content),
         })),
@@ -363,12 +363,9 @@ tabularRouter.get("/:reviewId/people", requireAuth, async (req, res) => {
             : []
     ).map((e) => (e ?? "").toLowerCase());
 
-    // Same pattern as /projects/:id/people: walk auth.users to map emails
-    // to user_ids, then pull display_names from user_profiles by user_id.
-    const { data: usersData } = await db.auth.admin.listUsers({
-        perPage: 1000,
-    });
-    const allUsers = usersData?.users ?? [];
+    // Query users table directly (replaces Supabase auth.admin.listUsers)
+    const { data: allUsersRaw } = await db.from("users").select("id, email");
+    const allUsers = (allUsersRaw ?? []) as { id: string; email: string }[];
     const userByEmail = new Map<string, { id: string; email: string }>();
     const userById = new Map<string, { id: string; email: string }>();
     for (const u of allUsers) {
@@ -490,7 +487,7 @@ tabularRouter.patch("/:reviewId", requireAuth, async (req, res) => {
             .eq("review_id", reviewId);
         const existingKeys = new Set(
             (existingCells ?? []).map(
-                (cell) => `${cell.document_id}:${cell.column_index}`,
+                (cell: Record<string, unknown>) => `${cell.document_id}:${cell.column_index}`,
             ),
         );
 
@@ -500,10 +497,10 @@ tabularRouter.patch("/:reviewId", requireAuth, async (req, res) => {
             // document_ids is the new source of truth — delete removed docs' cells
             const newDocIds = req.body.document_ids as string[];
             const existingDocIds = (existingCells ?? []).map(
-                (cell) => cell.document_id,
+                (cell: Record<string, unknown>) => cell.document_id as string,
             );
             const removedDocIds = existingDocIds.filter(
-                (id) => !newDocIds.includes(id),
+                (id: string) => !newDocIds.includes(id),
             );
 
             if (removedDocIds.length > 0) {
@@ -522,8 +519,8 @@ tabularRouter.patch("/:reviewId", requireAuth, async (req, res) => {
         } else {
             // No document change — derive from existing cells
             documentIds = [
-                ...new Set(
-                    (existingCells ?? []).map((cell) => cell.document_id),
+                ...new Set<string>(
+                    (existingCells ?? []).map((cell: Record<string, unknown>) => cell.document_id as string),
                 ),
             ];
             if (documentIds.length === 0 && existingReview.project_id) {
@@ -531,7 +528,7 @@ tabularRouter.patch("/:reviewId", requireAuth, async (req, res) => {
                     .from("documents")
                     .select("id")
                     .eq("project_id", existingReview.project_id);
-                documentIds = (projectDocs ?? []).map((doc) => doc.id);
+                documentIds = (projectDocs ?? []).map((doc: Record<string, unknown>) => doc.id as string);
             }
         }
 
@@ -762,7 +759,7 @@ tabularRouter.post("/:reviewId/generate", requireAuth, async (req, res) => {
     for (const cell of cells ?? [])
         cellMap.set(`${cell.document_id}:${cell.column_index}`, cell);
 
-    const docIds = [...new Set((cells ?? []).map((c) => c.document_id))];
+    const docIds = [...new Set((cells ?? []).map((c: Record<string, unknown>) => c.document_id as string))];
     let docs: Record<string, unknown>[] = [];
     if (docIds.length > 0) {
         const { data } = await db

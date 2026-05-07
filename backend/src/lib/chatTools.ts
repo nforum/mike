@@ -2956,7 +2956,7 @@ export async function buildWorkflowStore(
             .from("workflow_shares")
             .select("workflow_id")
             .eq("shared_with_email", normalizedUserEmail);
-        const sharedIds = [...new Set((shares ?? []).map((share) => share.workflow_id))];
+        const sharedIds = [...new Set((shares ?? []).map((share: { workflow_id: string }) => share.workflow_id))];
         if (sharedIds.length > 0) {
             const { data: sharedWorkflows } = await db
                 .from("workflows")

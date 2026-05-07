@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import { closePool } from "./lib/db";
 import { chatRouter } from "./routes/chat";
 import { projectsRouter } from "./routes/projects";
 import { projectChatRouter } from "./routes/projectChat";
@@ -38,6 +39,20 @@ app.use("/mcp/oauth", mcpOauthRouter);
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Mike backend running on port ${PORT}`);
 });
+
+// ── Graceful shutdown (Cloud Run sends SIGTERM) ─────────────
+function shutdown(signal: string) {
+  console.log(`[shutdown] Received ${signal}, closing server…`);
+  server.close(async () => {
+    await closePool();
+    console.log("[shutdown] Clean exit");
+    process.exit(0);
+  });
+  // Force exit after 10s if connections won't drain
+  setTimeout(() => process.exit(1), 10_000).unref();
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

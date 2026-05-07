@@ -1,9 +1,14 @@
 /**
  * Mike API client — all requests to the Node.js backend.
- * Attaches the Supabase auth token for user authentication.
+ * Attaches the OAuth JWT token for user authentication.
  */
 
-import { supabase } from "@/lib/supabase";
+import {
+    getStoredTokens,
+    getValidAccessToken,
+    refreshAccessToken,
+    clearTokens,
+} from "@/lib/oauth";
 import type {
     AssistantEvent,
     MikeChat,
@@ -37,18 +42,17 @@ interface ServerChatDetailOut {
 const API_BASE =
     process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
 
-async function getAuthHeader(): Promise<Record<string, string>> {
-    const {
-        data: { session },
-    } = await supabase.auth.getSession();
-    if (!session?.access_token) return {};
-    return { Authorization: `Bearer ${session.access_token}` };
+function getAuthHeader(): Record<string, string> {
+    const tokens = getStoredTokens();
+    if (!tokens?.access_token) return {};
+    return { Authorization: `Bearer ${tokens.access_token}` };
 }
 
 async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
-    const authHeaders = await getAuthHeader();
+    const authHeaders = getAuthHeader();
     const { headers: initHeaders, ...restInit } = init ?? {};
-    const response = await fetch(`${API_BASE}${path}`, {
+
+    let response = await fetch(`${API_BASE}${path}`, {
         cache: "no-store",
         ...restInit,
         headers: {
@@ -57,6 +61,36 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
             ...(initHeaders as Record<string, string> | undefined),
         },
     });
+
+    // Auto-refresh on 401 TOKEN_EXPIRED, retry once
+    if (response.status === 401) {
+        try {
+            const body = await response.clone().json();
+            if (body?.code === "TOKEN_EXPIRED") {
+                const refreshed = await refreshAccessToken();
+                if (refreshed) {
+                    response = await fetch(`${API_BASE}${path}`, {
+                        cache: "no-store",
+                        ...restInit,
+                        headers: {
+                            Accept: "application/json",
+                            Authorization: `Bearer ${refreshed.access_token}`,
+                            ...(initHeaders as Record<string, string> | undefined),
+                        },
+                    });
+                } else {
+                    // Refresh failed — force re-login
+                    clearTokens();
+                    if (typeof window !== "undefined") {
+                        window.location.href = "/login";
+                    }
+                    throw new Error("Session expired. Please sign in again.");
+                }
+            }
+        } catch (parseErr) {
+            // If we can't parse the 401 body, just throw
+        }
+    }
 
     if (!response.ok) {
         const detail = await response.text();
@@ -244,7 +278,7 @@ export async function uploadDocumentVersion(
     file: File,
     displayName?: string,
 ): Promise<MikeDocumentVersion> {
-    const authHeaders = await getAuthHeader();
+    const authHeaders = getAuthHeader();
     const form = new FormData();
     form.append("file", file);
     if (displayName) form.append("display_name", displayName);
@@ -279,7 +313,7 @@ export async function uploadProjectDocument(
     projectId: string,
     file: File,
 ): Promise<MikeDocument> {
-    const authHeaders = await getAuthHeader();
+    const authHeaders = getAuthHeader();
     const form = new FormData();
     form.append("file", file);
     const response = await fetch(
@@ -297,7 +331,7 @@ export async function uploadProjectDocument(
 export async function uploadStandaloneDocument(
     file: File,
 ): Promise<MikeDocument> {
-    const authHeaders = await getAuthHeader();
+    const authHeaders = getAuthHeader();
     const form = new FormData();
     form.append("file", file);
     const response = await fetch(`${API_BASE}/single-documents`, {
@@ -330,7 +364,7 @@ export async function getDocumentUrl(
 export async function downloadDocumentsZip(
     documentIds: string[],
 ): Promise<Blob> {
-    const authHeaders = await getAuthHeader();
+    const authHeaders = getAuthHeader();
     const response = await fetch(`${API_BASE}/single-documents/download-zip`, {
         method: "POST",
         cache: "no-store",
@@ -433,7 +467,7 @@ export async function streamChat(payload: {
     signal?: AbortSignal;
 }): Promise<Response> {
     const { signal, ...body } = payload;
-    const authHeaders = await getAuthHeader();
+    const authHeaders = getAuthHeader();
     return fetch(`${API_BASE}/chat`, {
         method: "POST",
         headers: {
@@ -463,7 +497,7 @@ export async function streamProjectChat(payload: {
     signal?: AbortSignal;
 }): Promise<Response> {
     const { projectId, signal, ...body } = payload;
-    const authHeaders = await getAuthHeader();
+    const authHeaders = getAuthHeader();
     return fetch(`${API_BASE}/projects/${projectId}/chat`, {
         method: "POST",
         headers: {
@@ -579,7 +613,7 @@ export async function deleteTabularReview(reviewId: string): Promise<void> {
 export async function streamTabularGeneration(
     reviewId: string,
 ): Promise<Response> {
-    const authHeaders = await getAuthHeader();
+    const authHeaders = getAuthHeader();
     return fetch(`${API_BASE}/tabular-review/${reviewId}/generate`, {
         method: "POST",
         headers: { ...authHeaders },
@@ -593,7 +627,7 @@ export async function streamTabularChat(
     signal?: AbortSignal,
     context?: { reviewTitle?: string | null; projectName?: string | null },
 ): Promise<Response> {
-    const authHeaders = await getAuthHeader();
+    const authHeaders = getAuthHeader();
     return fetch(`${API_BASE}/tabular-review/${reviewId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders },

@@ -90,11 +90,10 @@ export async function streamOpenAI(
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [
         { role: "system", content: systemPrompt },
-        ...params.messages.map(
-            (m): OpenAI.ChatCompletionMessageParam => ({
-                role: m.role,
-                content: m.content,
-            }),
+        ...params.messages.map((m): OpenAI.ChatCompletionMessageParam =>
+            m.role === "assistant"
+                ? { role: "assistant", content: m.content }
+                : { role: "user", content: m.content },
         ),
     ];
 
@@ -164,9 +163,9 @@ export async function streamOpenAI(
 
             const results = await runTools(toolCalls);
 
-            messages.push({
+            const assistantMsg: OpenAI.ChatCompletionAssistantMessageParam = {
                 role: "assistant",
-                content: textParts.join("") || null,
+                content: textParts.join("") || "",
                 tool_calls: toolCalls.map((tc) => ({
                     id: tc.id,
                     type: "function" as const,
@@ -175,7 +174,8 @@ export async function streamOpenAI(
                         arguments: JSON.stringify(tc.input),
                     },
                 })),
-            });
+            };
+            messages.push(assistantMsg);
 
             for (const r of results) {
                 messages.push({
@@ -213,7 +213,7 @@ export async function completeOpenAIText(params: {
     const resp = await client.chat.completions.create({
         model: actualModel,
         messages,
-        max_tokens: params.maxTokens ?? 512,
+        max_completion_tokens: params.maxTokens ?? 512,
     });
     return resp.choices[0]?.message?.content ?? "";
 }

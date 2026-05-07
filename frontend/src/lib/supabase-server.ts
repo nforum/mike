@@ -1,18 +1,16 @@
-import { createClient } from "@supabase/supabase-js";
-
 /**
- * Server-side Supabase client using the service role key.
- * Bypasses RLS — only use in API routes after verifying the user.
+ * Server-side auth helpers.
+ *
+ * Replaces the old Supabase service-role client with JWT decode.
+ * Signature verification is handled by the Node.js backend;
+ * these helpers only extract identity for Next.js API routes.
+ *
+ * @deprecated – Consider moving all server auth to the Node.js backend
  */
-export function createServerSupabase() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-    const key = process.env.SUPABASE_SECRET_KEY || "";
-    return createClient(url, key, { auth: { persistSession: false } });
-}
 
 /**
- * Extract and verify the Supabase JWT from the Authorization header.
- * Returns the user's UUID string, or throws a Response with 401.
+ * Extract user ID from the Authorization header JWT.
+ * Returns the `sub` claim (WordPress user ID), or throws 401.
  */
 export async function getUserIdFromRequest(req: Request): Promise<string> {
     const auth = req.headers.get("authorization") ?? "";
@@ -21,18 +19,28 @@ export async function getUserIdFromRequest(req: Request): Promise<string> {
     }
     const token = auth.slice(7).trim();
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-    const serviceKey = process.env.SUPABASE_SECRET_KEY || "";
+    try {
+        const parts = token.split(".");
+        if (parts.length !== 3) {
+            throw new Error("Invalid JWT format");
+        }
 
-    if (!supabaseUrl || !serviceKey) {
-        // Dev fallback — accept raw token as user ID
-        return token;
-    }
+        const payload = JSON.parse(
+            Buffer.from(parts[1], "base64url").toString("utf-8"),
+        );
 
-    const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-    const { data } = await admin.auth.getUser(token);
-    if (!data.user) {
+        if (!payload.sub) {
+            throw new Error("JWT missing sub claim");
+        }
+
+        // Check expiry
+        if (payload.exp && Date.now() / 1000 > payload.exp) {
+            throw new Response("Token expired", { status: 401 });
+        }
+
+        return String(payload.sub);
+    } catch (err) {
+        if (err instanceof Response) throw err;
         throw new Response("Invalid or expired token", { status: 401 });
     }
-    return data.user.id;
 }

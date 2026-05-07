@@ -5,79 +5,76 @@ import React, {
     useContext,
     useEffect,
     useState,
+    useCallback,
     ReactNode,
 } from "react";
-import { supabase } from "@/lib/supabase";
-
-interface User {
-    id: string;
-    email: string;
-}
+import {
+    getStoredTokens,
+    isAccessTokenExpired,
+    refreshAccessToken,
+    decodeJwtPayload,
+    signOut as oauthSignOut,
+    type OAuthUser,
+} from "@/lib/oauth";
 
 interface AuthContextType {
-    user: User | null;
+    user: OAuthUser | null;
     isAuthenticated: boolean;
     authLoading: boolean;
+    tier: "free" | "plus";
     signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<OAuthUser | null>(null);
     const [authLoading, setAuthLoading] = useState(true);
 
-    useEffect(() => {
-        const ensureProfile = async (accessToken: string) => {
-            const apiBase =
-                process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
-            await fetch(`${apiBase}/user/profile`, {
-                method: "POST",
-                headers: { Authorization: `Bearer ${accessToken}` },
-            }).catch((e) => {
-                console.log(e);
-            });
-        };
-
-        const checkUser = async () => {
-            const {
-                data: { session },
-            } = await supabase.auth.getSession();
-
-            if (session?.user) {
-                setUser({
-                    id: session.user.id,
-                    email: session.user.email || "",
-                });
-                ensureProfile(session.access_token);
-            }
+    const loadUser = useCallback(async () => {
+        const tokens = getStoredTokens();
+        if (!tokens) {
+            setUser(null);
             setAuthLoading(false);
-        };
+            return;
+        }
 
-        checkUser();
-
-        const {
-            data: { subscription },
-        } = supabase.auth.onAuthStateChange(async (_event, session) => {
-            if (session?.user) {
-                setUser({
-                    id: session.user.id,
-                    email: session.user.email || "",
-                });
-                ensureProfile(session.access_token);
-            } else {
+        // If access token expired, try refresh
+        if (isAccessTokenExpired()) {
+            const refreshed = await refreshAccessToken();
+            if (!refreshed) {
                 setUser(null);
+                setAuthLoading(false);
+                return;
             }
-            setAuthLoading(false);
-        });
 
-        return () => {
-            subscription.unsubscribe();
-        };
+            const decoded = decodeJwtPayload(refreshed.access_token);
+            setUser(decoded);
+            setAuthLoading(false);
+            return;
+        }
+
+        // Token is still valid — decode for user info
+        const decoded = decodeJwtPayload(tokens.access_token);
+        setUser(decoded);
+        setAuthLoading(false);
     }, []);
 
-    const signOut = async () => {
-        await supabase.auth.signOut();
+    useEffect(() => {
+        loadUser();
+
+        // Listen for token changes from other tabs
+        const onStorage = (e: StorageEvent) => {
+            if (e.key === "mike_oauth_tokens") {
+                loadUser();
+            }
+        };
+        window.addEventListener("storage", onStorage);
+        return () => window.removeEventListener("storage", onStorage);
+    }, [loadUser]);
+
+    const handleSignOut = async () => {
+        await oauthSignOut();
         setUser(null);
     };
 
@@ -87,7 +84,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 user,
                 isAuthenticated: !!user,
                 authLoading,
-                signOut,
+                tier: user?.tier ?? "free",
+                signOut: handleSignOut,
             }}
         >
             {children}

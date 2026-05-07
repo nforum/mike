@@ -81,7 +81,7 @@ documentsRouter.delete("/:documentId", requireAuth, async (req, res) => {
     .select("storage_path, pdf_storage_path")
     .eq("document_id", documentId);
   await Promise.all(
-    (versions ?? []).flatMap((v) =>
+    (versions ?? []).flatMap((v: { storage_path?: string; pdf_storage_path?: string }) =>
       [v.storage_path, v.pdf_storage_path]
         .filter((p): p is string => typeof p === "string" && p.length > 0)
         .map((p) => deleteFile(p).catch(() => {})),
@@ -170,7 +170,7 @@ documentsRouter.post("/download-zip", requireAuth, async (req, res) => {
   if (error) return void res.status(500).json({ detail: error.message });
   // Filter to docs the user actually has access to (own + shared-project).
   const accessChecks = await Promise.all(
-    (rawDocs ?? []).map(async (d) => ({
+    (rawDocs ?? []).map(async (d: Record<string, unknown>) => ({
       doc: d,
       access: await ensureDocAccess(
         d as { user_id: string; project_id: string | null },

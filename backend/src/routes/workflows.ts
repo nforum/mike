@@ -1,15 +1,8 @@
 import { Router } from "express";
-import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "../middleware/auth";
 import { createServerSupabase } from "../lib/supabase";
 
-function getAdminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
-    process.env.SUPABASE_SECRET_KEY ?? "",
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-}
+
 
 export const workflowsRouter = Router();
 
@@ -100,29 +93,30 @@ workflowsRouter.get("/", requireAuth, async (req, res) => {
 
   let sharedWorkflows: Record<string, unknown>[] = [];
   if (shares && shares.length > 0) {
-    const sharedIds = shares.map((s) => s.workflow_id);
+    const sharedIds = shares.map((s: Record<string, unknown>) => s.workflow_id as string);
     let sharedQuery = db.from("workflows").select("*").in("id", sharedIds);
     if (type) sharedQuery = sharedQuery.eq("type", type);
     const { data: wfs } = await sharedQuery;
 
     if (wfs && wfs.length > 0) {
       // Fetch sharer profiles
-      const sharerIds = [...new Set(shares.map((s) => s.shared_by_user_id).filter(Boolean))];
+      const sharerIds = [...new Set(shares.map((s: Record<string, unknown>) => s.shared_by_user_id as string).filter(Boolean))];
       const { data: profiles } = sharerIds.length > 0
         ? await db.from("user_profiles").select("user_id, display_name").in("user_id", sharerIds)
-        : { data: [] };
+        : { data: [] as Record<string, unknown>[] };
 
-      // Fetch sharer emails via admin client
-      const admin = getAdminClient();
-      const { data: authData } = await admin.auth.admin.listUsers({ perPage: 1000 });
-      const authUsers = authData?.users ?? [];
+      // Fetch sharer emails from users table (replaces Supabase admin client)
+      const { data: authUsersRaw } = sharerIds.length > 0
+        ? await db.from("users").select("id, email").in("id", sharerIds)
+        : { data: [] as Record<string, unknown>[] };
+      const authUsers = (authUsersRaw ?? []) as { id: string; email: string }[];
 
-      sharedWorkflows = wfs.map((wf) => {
-        const share = shares.find((s) => s.workflow_id === wf.id);
+      sharedWorkflows = wfs.map((wf: Record<string, unknown>) => {
+        const share = shares.find((s: Record<string, unknown>) => s.workflow_id === wf.id);
         const sharerId = share?.shared_by_user_id;
-        const profile = profiles?.find((p) => p.user_id === sharerId);
-        const authUser = authUsers.find((u) => u.id === sharerId);
-        const shared_by_name = profile?.display_name || authUser?.email || null;
+        const profile = (profiles ?? []).find((p: Record<string, unknown>) => p.user_id === sharerId);
+        const authUser = authUsers.find((u: { id: string; email: string }) => u.id === sharerId);
+        const shared_by_name = (profile?.display_name as string | null) || authUser?.email || null;
         return withWorkflowAccess(wf, {
           allowEdit: !!share?.allow_edit,
           isOwner: false,
@@ -132,7 +126,7 @@ workflowsRouter.get("/", requireAuth, async (req, res) => {
     }
   }
 
-  const ownWithFlag = (own ?? []).map((wf) =>
+  const ownWithFlag = (own ?? []).map((wf: Record<string, unknown>) =>
     withWorkflowAccess(wf, { allowEdit: true, isOwner: true }),
   );
   res.json([...ownWithFlag, ...sharedWorkflows]);
@@ -240,7 +234,7 @@ workflowsRouter.get("/hidden", requireAuth, async (req, res) => {
     .select("workflow_id")
     .eq("user_id", userId);
   if (error) return void res.status(500).json({ detail: error.message });
-  res.json((data ?? []).map((r) => r.workflow_id));
+  res.json((data ?? []).map((r: Record<string, unknown>) => r.workflow_id));
 });
 
 // POST /workflows/hidden

@@ -11,9 +11,7 @@
  * owner-only (delete, rename, member management).
  */
 
-import type { createServerSupabase } from "./supabase";
-
-type Db = ReturnType<typeof createServerSupabase>;
+import { from } from "./dbShim";
 
 export type ProjectAccess =
     | {
@@ -31,10 +29,9 @@ export async function checkProjectAccess(
     projectId: string,
     userId: string,
     userEmail: string | null | undefined,
-    db: Db,
+    _db?: unknown, // Backward compat — callers may still pass db; we ignore it
 ): Promise<ProjectAccess> {
-    const { data: project } = await db
-        .from("projects")
+    const { data: project } = await from("projects")
         .select("id, user_id, shared_with")
         .eq("id", projectId)
         .single();
@@ -68,7 +65,7 @@ export async function ensureDocAccess(
     doc: { user_id: string; project_id: string | null },
     userId: string,
     userEmail: string | null | undefined,
-    db: Db,
+    _db?: unknown, // Backward compat — callers may still pass db; we ignore it
 ): Promise<{ ok: true; isOwner: boolean } | { ok: false }> {
     if (doc.user_id === userId) return { ok: true, isOwner: true };
     if (!doc.project_id) return { ok: false };
@@ -76,7 +73,6 @@ export async function ensureDocAccess(
         doc.project_id,
         userId,
         userEmail,
-        db,
     );
     if (access.ok) return { ok: true, isOwner: false };
     return { ok: false };
@@ -99,7 +95,7 @@ export async function ensureReviewAccess(
     },
     userId: string,
     userEmail: string | null | undefined,
-    db: Db,
+    _db?: unknown, // Backward compat — callers may still pass db; we ignore it
 ): Promise<{ ok: true; isOwner: boolean } | { ok: false }> {
     if (review.user_id === userId) return { ok: true, isOwner: true };
     const email = (userEmail ?? "").toLowerCase();
@@ -113,7 +109,6 @@ export async function ensureReviewAccess(
         review.project_id,
         userId,
         userEmail,
-        db,
     );
     if (access.ok) return { ok: true, isOwner: false };
     return { ok: false };
@@ -127,17 +122,16 @@ export async function ensureReviewAccess(
 export async function listAccessibleProjectIds(
     userId: string,
     userEmail: string | null | undefined,
-    db: Db,
+    _db?: unknown, // Backward compat — callers may still pass db; we ignore it
 ): Promise<string[]> {
     const [{ data: own }, { data: shared }] = await Promise.all([
-        db.from("projects").select("id").eq("user_id", userId),
+        from("projects").select("id").eq("user_id", userId),
         userEmail
-            ? db
-                  .from("projects")
+            ? from("projects")
                   .select("id")
                   .contains("shared_with", [userEmail])
                   .neq("user_id", userId)
-            : Promise.resolve({ data: [] as { id: string }[] }),
+            : Promise.resolve({ data: [] as { id: string }[], error: null, count: null }),
     ]);
     const ids = new Set<string>();
     for (const p of (own ?? []) as { id: string }[]) ids.add(p.id);
