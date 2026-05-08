@@ -1,11 +1,12 @@
 import { MODELS, type ModelOption } from "../components/assistant/ModelToggle";
 
-export type ModelProvider = "claude" | "gemini" | "openai";
+export type ModelProvider = "claude" | "gemini" | "openai" | "mistral";
 
 export type ApiKeys = {
     claudeApiKey: string | null;
     geminiApiKey: string | null;
     openaiApiKey: string | null;
+    mistralApiKey: string | null;
 };
 
 export function getModelProvider(modelId: string): ModelProvider | null {
@@ -13,6 +14,7 @@ export function getModelProvider(modelId: string): ModelProvider | null {
     if (!model) return null;
     if (model.group === "Anthropic") return "claude";
     if (model.group === "OpenAI" || model.group === "LocalLLM") return "openai";
+    if (model.group === "Mistral") return "mistral";
     return "gemini";
 }
 
@@ -27,6 +29,7 @@ export function isModelAvailable(
     if (model?.group === "LocalLLM") return true;
     if (provider === "claude") return !!apiKeys.claudeApiKey?.trim();
     if (provider === "openai") return !!apiKeys.openaiApiKey?.trim();
+    if (provider === "mistral") return !!apiKeys.mistralApiKey?.trim();
     return !!apiKeys.geminiApiKey?.trim();
 }
 
@@ -36,12 +39,14 @@ export function isProviderAvailable(
 ): boolean {
     if (provider === "claude") return !!apiKeys.claudeApiKey?.trim();
     if (provider === "openai") return !!apiKeys.openaiApiKey?.trim();
+    if (provider === "mistral") return !!apiKeys.mistralApiKey?.trim();
     return !!apiKeys.geminiApiKey?.trim();
 }
 
 export function providerLabel(provider: ModelProvider): string {
     if (provider === "claude") return "Anthropic (Claude)";
     if (provider === "openai") return "OpenAI (GPT)";
+    if (provider === "mistral") return "Mistral AI";
     return "Google (Gemini)";
 }
 
@@ -50,5 +55,6 @@ export function modelGroupToProvider(
 ): ModelProvider {
     if (group === "Anthropic") return "claude";
     if (group === "OpenAI" || group === "LocalLLM") return "openai";
+    if (group === "Mistral") return "mistral";
     return "gemini";
 }

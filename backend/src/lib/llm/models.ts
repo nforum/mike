@@ -11,12 +11,14 @@ export const GEMINI_MAIN_MODELS = [
 ] as const;
 export const OPENAI_MAIN_MODELS = ["gpt-5.5"] as const;
 export const LOCAL_LLM_MAIN_MODELS = ["localllm-main"] as const;
+export const MISTRAL_MAIN_MODELS = ["mistral-large-latest", "mistral-medium-latest"] as const;
 
 // Mid-tier (used for tabular review) — user picks one in account settings.
 export const CLAUDE_MID_MODELS = ["claude-sonnet-4-6"] as const;
 export const GEMINI_MID_MODELS = ["gemini-3-flash-preview"] as const;
 export const OPENAI_MID_MODELS = ["gpt-5.4-nano"] as const;
 export const LOCAL_LLM_MID_MODELS = ["localllm-main"] as const;
+export const MISTRAL_MID_MODELS = ["mistral-small-latest"] as const;
 
 // Low-tier (used for title generation, lightweight extractions) — user picks
 // one in account settings.
@@ -24,6 +26,7 @@ export const CLAUDE_LOW_MODELS = ["claude-haiku-4-5"] as const;
 export const GEMINI_LOW_MODELS = ["gemini-3.1-flash-lite-preview"] as const;
 export const OPENAI_LOW_MODELS = ["gpt-5.4-nano"] as const;
 export const LOCAL_LLM_LOW_MODELS = ["localllm-lite"] as const;
+export const MISTRAL_LOW_MODELS = ["mistral-small-latest"] as const;
 
 export const DEFAULT_MAIN_MODEL = "localllm-main";
 export const DEFAULT_TITLE_MODEL = "localllm-lite";
@@ -34,14 +37,17 @@ const ALL_MODELS = new Set<string>([
     ...GEMINI_MAIN_MODELS,
     ...OPENAI_MAIN_MODELS,
     ...LOCAL_LLM_MAIN_MODELS,
+    ...MISTRAL_MAIN_MODELS,
     ...CLAUDE_MID_MODELS,
     ...GEMINI_MID_MODELS,
     ...OPENAI_MID_MODELS,
     ...LOCAL_LLM_MID_MODELS,
+    ...MISTRAL_MID_MODELS,
     ...CLAUDE_LOW_MODELS,
     ...GEMINI_LOW_MODELS,
     ...OPENAI_LOW_MODELS,
     ...LOCAL_LLM_LOW_MODELS,
+    ...MISTRAL_LOW_MODELS,
 ]);
 
 // ---------------------------------------------------------------------------
@@ -52,6 +58,7 @@ export function providerForModel(model: string): Provider {
     if (model.startsWith("localllm")) return "openai";
     if (model.startsWith("claude")) return "claude";
     if (model.startsWith("gemini")) return "gemini";
+    if (model.startsWith("mistral")) return "mistral";
     if (model.startsWith("gpt-") || model.startsWith("o1-") || model.startsWith("o3-") || model.startsWith("o4-")) return "openai";
     throw new Error(`Unknown model id: ${model}`);
 }

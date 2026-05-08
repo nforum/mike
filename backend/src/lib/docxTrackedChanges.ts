@@ -710,18 +710,75 @@ function maxTrackedId(doc: XNode[]): number {
 }
 
 /**
+ * Parse `word/comments.xml` from the zip and return a map from comment id
+ * to `{ author, text }`.  Returns an empty map if the file doesn't exist
+ * or is malformed — callers can safely proceed without comments.
+ */
+async function parseComments(
+    zip: JSZip,
+    parser: ReturnType<typeof createParser>,
+): Promise<Map<string, { author: string; text: string }>> {
+    const map = new Map<string, { author: string; text: string }>();
+    const commentsFile = getZipEntry(zip, "word/comments.xml");
+    if (!commentsFile) return map;
+    try {
+        const xml = await commentsFile.async("string");
+        const tree = parser.parse(xml) as XNode[];
+        // tree → [ { "w:comments": [...] } ]
+        for (const top of tree) {
+            if (elName(top) !== "w:comments") continue;
+            for (const cNode of elChildren(top)) {
+                if (elName(cNode) !== "w:comment") continue;
+                const attrs = elAttrs(cNode);
+                const id = String(attrs["@_w:id"] ?? "");
+                const author = String(attrs["@_w:author"] ?? "Unknown");
+                // Collect all text from w:p > w:r > w:t inside the comment
+                const parts: string[] = [];
+                const collectText = (nodes: XNode[]) => {
+                    for (const n of nodes) {
+                        const name = elName(n);
+                        if (!name) {
+                            if (isTextNode(n)) parts.push(String((n as any)[TEXT_KEY]));
+                            continue;
+                        }
+                        if (name === "w:t") {
+                            parts.push(getTextContent(n));
+                        } else {
+                            collectText(elChildren(n));
+                        }
+                    }
+                };
+                collectText(elChildren(cNode));
+                if (id) map.set(id, { author, text: parts.join("") });
+            }
+        }
+    } catch {
+        // Malformed comments.xml — continue without comments
+    }
+    return map;
+}
+
+/**
  * Extract the body text of a .docx using the same flattening rules as the
  * tracked-changes matcher. Paragraphs are joined by a single newline. The
  * output is what the LLM should base its `find` / `context_before` /
  * `context_after` strings on, since it exactly mirrors the string the
  * anchor matcher operates against.
+ *
+ * Comment bubbles from `word/comments.xml` are surfaced as inline markers:
+ * `{>>by Author Name: comment text<<}` placed at the w:commentRangeEnd
+ * position within the paragraph.
  */
 export async function extractDocxBodyText(bytes: Buffer): Promise<string> {
     const zip = await JSZip.loadAsync(bytes);
+    const parser = createParser();
+
+    // Load comments map (empty if no comments.xml)
+    const commentsMap = await parseComments(zip, parser);
+
     const docXmlFile = getZipEntry(zip, "word/document.xml");
     if (!docXmlFile) return "";
     const docXmlRaw = await docXmlFile.async("string");
-    const parser = createParser();
     const tree = parser.parse(docXmlRaw) as XNode[];
     const bodyChildren = findBody(tree);
     if (!bodyChildren) return "";
@@ -732,8 +789,42 @@ export async function extractDocxBodyText(bytes: Buffer): Promise<string> {
             const name = elName(n);
             if (!name) continue;
             if (name === "w:p") {
-                const flat = flattenParagraph(elChildren(n));
-                lines.push(flat.paraText);
+                // Walk paragraph children to build text + inline comments
+                const paraKids = elChildren(n);
+                let paraText = "";
+                // Pending comment IDs that have started but not yet ended
+                for (const kid of paraKids) {
+                    const kidName = elName(kid);
+                    if (kidName === "w:r") {
+                        // Extract text from run
+                        for (const rk of elChildren(kid)) {
+                            if (elName(rk) === "w:t") {
+                                paraText += getTextContent(rk);
+                            }
+                        }
+                    } else if (kidName === "w:ins") {
+                        // Accepted view: include inserted text
+                        for (const inner of elChildren(kid)) {
+                            if (elName(inner) === "w:r") {
+                                for (const rk of elChildren(inner)) {
+                                    if (elName(rk) === "w:t") {
+                                        paraText += getTextContent(rk);
+                                    }
+                                }
+                            }
+                        }
+                    } else if (kidName === "w:commentRangeEnd") {
+                        // Insert comment marker at this position
+                        const attrs = elAttrs(kid);
+                        const commentId = String(attrs["@_w:id"] ?? "");
+                        const comment = commentsMap.get(commentId);
+                        if (comment) {
+                            paraText += ` {>>by ${comment.author}: ${comment.text}<<}`;
+                        }
+                    }
+                    // w:del, w:commentRangeStart, w:bookmarkStart/End, etc. — skip
+                }
+                lines.push(paraText);
             } else if (
                 name === "w:tbl" ||
                 name === "w:tr" ||

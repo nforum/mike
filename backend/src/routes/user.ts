@@ -6,7 +6,7 @@ import { encryptApiKey, maskApiKey } from "../lib/crypto";
 
 export const userRouter = Router();
 
-const API_KEY_FIELDS = ["claude_api_key", "gemini_api_key", "openai_api_key"] as const;
+const API_KEY_FIELDS = ["claude_api_key", "gemini_api_key", "openai_api_key", "mistral_api_key"] as const;
 
 // GET /user/profile
 userRouter.get("/profile", requireAuth, async (_req, res) => {
@@ -28,6 +28,7 @@ userRouter.get("/profile", requireAuth, async (_req, res) => {
       claude_api_key: null,
       gemini_api_key: null,
       openai_api_key: null,
+      mistral_api_key: null,
     });
   }
 
@@ -44,7 +45,7 @@ userRouter.patch("/profile", requireAuth, async (req, res) => {
   const userId = res.locals.userId as string;
   const allowed = [
     "display_name", "organisation", "tabular_model",
-    "claude_api_key", "gemini_api_key", "openai_api_key",
+    "claude_api_key", "gemini_api_key", "openai_api_key", "mistral_api_key",
     "message_credits_used", "credits_reset_date",
   ];
   const updates: Record<string, any> = { updated_at: new Date().toISOString() };

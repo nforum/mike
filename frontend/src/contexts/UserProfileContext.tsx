@@ -21,6 +21,7 @@ interface UserProfile {
     claudeApiKey: string | null;
     geminiApiKey: string | null;
     openaiApiKey: string | null;
+    mistralApiKey: string | null;
 }
 
 interface UserProfileContextType {
@@ -33,7 +34,7 @@ interface UserProfileContextType {
         value: string,
     ) => Promise<boolean>;
     updateApiKey: (
-        provider: "claude" | "gemini" | "openai",
+        provider: "claude" | "gemini" | "openai" | "mistral",
         value: string | null,
     ) => Promise<boolean>;
     reloadProfile: () => Promise<void>;
@@ -92,6 +93,7 @@ function mapServerProfile(data: any): UserProfile {
         claudeApiKey: data.claude_api_key ?? null,
         geminiApiKey: data.gemini_api_key ?? null,
         openaiApiKey: data.openai_api_key ?? null,
+        mistralApiKey: data.mistral_api_key ?? null,
     };
 }
 
@@ -106,6 +108,7 @@ const DEFAULT_PROFILE: UserProfile = {
     claudeApiKey: null,
     geminiApiKey: null,
     openaiApiKey: null,
+    mistralApiKey: null,
 };
 
 export function UserProfileProvider({ children }: { children: ReactNode }) {
@@ -212,7 +215,7 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
 
     const updateApiKey = useCallback(
         async (
-            provider: "claude" | "gemini" | "openai",
+            provider: "claude" | "gemini" | "openai" | "mistral",
             value: string | null,
         ): Promise<boolean> => {
             if (!user) return false;
@@ -221,13 +224,17 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
                     ? "claude_api_key"
                     : provider === "openai"
                       ? "openai_api_key"
-                      : "gemini_api_key";
+                      : provider === "mistral"
+                        ? "mistral_api_key"
+                        : "gemini_api_key";
             const stateField =
                 provider === "claude"
                     ? "claudeApiKey"
                     : provider === "openai"
                       ? "openaiApiKey"
-                      : "geminiApiKey";
+                      : provider === "mistral"
+                        ? "mistralApiKey"
+                        : "geminiApiKey";
             const normalized = value?.trim() ? value.trim() : null;
             try {
                 await patchProfile({ [dbField]: normalized });

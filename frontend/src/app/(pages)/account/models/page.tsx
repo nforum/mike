@@ -17,6 +17,7 @@ import { MODELS } from "@/app/components/assistant/ModelToggle";
 import {
     isModelAvailable,
     modelGroupToProvider,
+    providerLabel,
 } from "@/app/lib/modelAvailability";
 
 export default function ModelsAndApiKeysPage() {
@@ -45,6 +46,7 @@ export default function ModelsAndApiKeysPage() {
                                 claudeApiKey: profile?.claudeApiKey ?? null,
                                 geminiApiKey: profile?.geminiApiKey ?? null,
                                 openaiApiKey: profile?.openaiApiKey ?? null,
+                                mistralApiKey: profile?.mistralApiKey ?? null,
                             }}
                             onChange={(id) =>
                                 updateModelPreference("tabularModel", id)
@@ -99,6 +101,14 @@ export default function ModelsAndApiKeysPage() {
                             updateApiKey("openai", value.trim() || null)
                         }
                     />
+                    <ApiKeyField
+                        label="Mistral AI API Key"
+                        placeholder="sk-…"
+                        initialValue={profile?.mistralApiKey ?? ""}
+                        onSave={(value) =>
+                            updateApiKey("mistral", value.trim() || null)
+                        }
+                    />
                 </div>
             </div>
         </div>
@@ -112,12 +122,12 @@ function TabularModelDropdown({
 }: {
     value: string;
     onChange: (id: string) => void;
-    apiKeys: { claudeApiKey: string | null; geminiApiKey: string | null; openaiApiKey: string | null };
+    apiKeys: { claudeApiKey: string | null; geminiApiKey: string | null; openaiApiKey: string | null; mistralApiKey: string | null };
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const selected = MODELS.find((m) => m.id === value);
     const selectedAvailable = isModelAvailable(value, apiKeys);
-    const groups: ("LocalLLM" | "Anthropic" | "Google" | "OpenAI")[] = ["LocalLLM", "Anthropic", "Google", "OpenAI"];
+    const groups: ("LocalLLM" | "Anthropic" | "Google" | "OpenAI" | "Mistral")[] = ["LocalLLM", "Anthropic", "Google", "OpenAI", "Mistral"];
 
     return (
         <DropdownMenu onOpenChange={setIsOpen}>
@@ -159,10 +169,8 @@ function TabularModelDropdown({
                                     m.id,
                                     apiKeys,
                                 );
-                                const tooltip = !available
-                                    ? provider === "openai"
-                                        ? "LocalLLM configured by server"
-                                        : `Add a ${provider === "claude" ? "Claude" : "Gemini"} API key to use this model`
+                                const tooltip = !available && m.group !== "LocalLLM"
+                                    ? `Add a ${providerLabel(provider)} API key to use this model`
                                     : undefined;
                                 return (
                                     <DropdownMenuItem
@@ -172,11 +180,11 @@ function TabularModelDropdown({
                                         title={tooltip}
                                     >
                                         <span
-                                            className={`flex-1 ${available ? "" : "text-gray-400"}`}
+                                            className={`flex-1 ${available ? "" : m.group === "LocalLLM" ? "" : "text-gray-400"}`}
                                         >
                                             {m.label}
                                         </span>
-                                        {!available && provider !== "openai" && (
+                                        {!available && m.group !== "LocalLLM" && (
                                             <AlertCircle className="h-3.5 w-3.5 text-red-500 ml-1" />
                                         )}
                                         {m.id === value && available && (

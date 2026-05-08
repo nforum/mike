@@ -24,6 +24,7 @@ function resolveTitleModel(apiKeys: UserApiKeys): string {
     if (apiKeys.gemini?.trim()) return DEFAULT_TITLE_MODEL;
     if (apiKeys.claude?.trim()) return "claude-haiku-4-5";
     if (apiKeys.openai?.trim()) return "gpt-5.4-nano";
+    if (apiKeys.mistral?.trim() || process.env.MISTRAL_API_KEY?.trim()) return "mistral-small-latest";
     return DEFAULT_TITLE_MODEL;
 }
 
@@ -45,7 +46,7 @@ export async function getUserModelSettings(
     const client = db ?? createServerSupabase();
     const { data } = await client
         .from("user_profiles")
-        .select("tabular_model, claude_api_key, gemini_api_key, openai_api_key")
+        .select("tabular_model, claude_api_key, gemini_api_key, openai_api_key, mistral_api_key")
         .eq("user_id", userId)
         .single();
 
@@ -53,6 +54,7 @@ export async function getUserModelSettings(
         claude: safeDecrypt(data?.claude_api_key),
         gemini: safeDecrypt(data?.gemini_api_key),
         openai: safeDecrypt(data?.openai_api_key) ?? process.env.VLLM_API_KEY ?? null,
+        mistral: safeDecrypt(data?.mistral_api_key),
     };
 
     return {
@@ -69,12 +71,13 @@ export async function getUserApiKeys(
     const client = db ?? createServerSupabase();
     const { data } = await client
         .from("user_profiles")
-        .select("claude_api_key, gemini_api_key, openai_api_key")
+        .select("claude_api_key, gemini_api_key, openai_api_key, mistral_api_key")
         .eq("user_id", userId)
         .single();
     return {
         claude: safeDecrypt(data?.claude_api_key),
         gemini: safeDecrypt(data?.gemini_api_key),
         openai: safeDecrypt(data?.openai_api_key) ?? process.env.VLLM_API_KEY ?? null,
+        mistral: safeDecrypt(data?.mistral_api_key),
     };
 }

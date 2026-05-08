@@ -453,7 +453,7 @@ function TRChatInput({
     onCancel: () => void;
     model: string;
     onModelChange: (id: string) => void;
-    apiKeys: { claudeApiKey: string | null; geminiApiKey: string | null; openaiApiKey: string | null };
+    apiKeys: { claudeApiKey: string | null; geminiApiKey: string | null; openaiApiKey: string | null; mistralApiKey: string | null };
 }) {
     const [value, setValue] = useState("");
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -611,6 +611,7 @@ export function TRChatPanel({
         claudeApiKey: profile?.claudeApiKey ?? null,
         geminiApiKey: profile?.geminiApiKey ?? null,
         openaiApiKey: profile?.openaiApiKey ?? null,
+        mistralApiKey: profile?.mistralApiKey ?? null,
     };
     const currentModel = profile?.tabularModel ?? "gemini-3-flash-preview";
     const [apiKeyModalProvider, setApiKeyModalProvider] =

@@ -15,7 +15,7 @@ import { isModelAvailable } from "@/app/lib/modelAvailability";
 export interface ModelOption {
     id: string;
     label: string;
-    group: "Anthropic" | "Google" | "OpenAI" | "LocalLLM";
+    group: "Anthropic" | "Google" | "OpenAI" | "LocalLLM" | "Mistral";
 }
 
 export const MODELS: ModelOption[] = [
@@ -27,13 +27,16 @@ export const MODELS: ModelOption[] = [
     { id: "gemini-3-flash-preview", label: "Gemini 3 Flash", group: "Google" },
     { id: "gpt-5.5", label: "GPT-5.5", group: "OpenAI" },
     { id: "gpt-5.4-nano", label: "GPT-5.4 Nano", group: "OpenAI" },
+    { id: "mistral-large-latest", label: "Mistral Large", group: "Mistral" },
+    { id: "mistral-medium-latest", label: "Mistral Medium", group: "Mistral" },
+    { id: "mistral-small-latest", label: "Mistral Small", group: "Mistral" },
 ];
 
 export const DEFAULT_MODEL_ID = "localllm-main";
 
 export const ALLOWED_MODEL_IDS = new Set(MODELS.map((m) => m.id));
 
-const GROUP_ORDER: ModelOption["group"][] = ["LocalLLM", "Anthropic", "Google", "OpenAI"];
+const GROUP_ORDER: ModelOption["group"][] = ["LocalLLM", "Anthropic", "Google", "OpenAI", "Mistral"];
 
 interface Props {
     value: string;
@@ -42,6 +45,7 @@ interface Props {
         claudeApiKey: string | null;
         geminiApiKey: string | null;
         openaiApiKey: string | null;
+        mistralApiKey: string | null;
     };
 }
 
