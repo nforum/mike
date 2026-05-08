@@ -275,6 +275,7 @@ export class QueryBuilder {
           return { data: null, error: new Error(`Unknown operation: ${this._operation}`), count: null };
       }
     } catch (err) {
+      console.error(`[dbShim] ${this._operation} on "${this._table}" failed:`, (err as Error).message);
       return { data: null, error: err as Error, count: null };
     }
   }

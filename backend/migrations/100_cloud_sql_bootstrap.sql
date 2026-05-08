@@ -84,10 +84,14 @@ CREATE TABLE IF NOT EXISTS public.projects (
   user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   name text NOT NULL DEFAULT 'Untitled Project',
   description text DEFAULT '',
+  cm_number text,
+  visibility text NOT NULL DEFAULT 'private',
+  shared_with jsonb NOT NULL DEFAULT '[]'::jsonb,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_projects_user ON public.projects(user_id);
+CREATE INDEX IF NOT EXISTS projects_shared_with_idx ON public.projects USING gin (shared_with);
 
 -- Project subfolders
 CREATE TABLE IF NOT EXISTS public.project_subfolders (
