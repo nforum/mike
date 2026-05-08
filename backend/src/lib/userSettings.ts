@@ -5,6 +5,7 @@ import {
     DEFAULT_TABULAR_MODEL,
     type UserApiKeys,
 } from "./llm";
+import { decryptApiKey } from "./crypto";
 
 export type UserModelSettings = {
     title_model: string;
@@ -26,6 +27,17 @@ function resolveTitleModel(apiKeys: UserApiKeys): string {
     return DEFAULT_TITLE_MODEL;
 }
 
+/** Try to decrypt; if the value isn't encrypted just return as-is. */
+function safeDecrypt(val: string | null | undefined): string | null {
+    if (!val?.trim()) return null;
+    try {
+        return decryptApiKey(val);
+    } catch {
+        // Might be a plaintext key from before encryption was added
+        return val;
+    }
+}
+
 export async function getUserModelSettings(
     userId: string,
     db?: ReturnType<typeof createServerSupabase>,
@@ -38,9 +50,9 @@ export async function getUserModelSettings(
         .single();
 
     const api_keys: UserApiKeys = {
-        claude: data?.claude_api_key ?? null,
-        gemini: data?.gemini_api_key ?? null,
-        openai: data?.openai_api_key ?? process.env.VLLM_API_KEY ?? null,
+        claude: safeDecrypt(data?.claude_api_key),
+        gemini: safeDecrypt(data?.gemini_api_key),
+        openai: safeDecrypt(data?.openai_api_key) ?? process.env.VLLM_API_KEY ?? null,
     };
 
     return {
@@ -61,8 +73,8 @@ export async function getUserApiKeys(
         .eq("user_id", userId)
         .single();
     return {
-        claude: data?.claude_api_key ?? null,
-        gemini: data?.gemini_api_key ?? null,
-        openai: data?.openai_api_key ?? process.env.VLLM_API_KEY ?? null,
+        claude: safeDecrypt(data?.claude_api_key),
+        gemini: safeDecrypt(data?.gemini_api_key),
+        openai: safeDecrypt(data?.openai_api_key) ?? process.env.VLLM_API_KEY ?? null,
     };
 }

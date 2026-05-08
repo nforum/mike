@@ -22,6 +22,20 @@ interface ShimResult<T = any> {
 }
 
 /**
+ * The `pg` driver doesn't automatically JSON.stringify plain objects/arrays
+ * for jsonb columns — it sends them via `.toString()` which produces
+ * `[object Object]`, causing "invalid input syntax for type json".
+ * This helper serialises non-primitive values so Postgres receives valid JSON.
+ */
+function pgValue(v: unknown): unknown {
+  if (v === null || v === undefined) return v;
+  if (v instanceof Date) return v;
+  if (Buffer.isBuffer(v)) return v;
+  if (typeof v === 'object') return JSON.stringify(v);
+  return v;
+}
+
+/**
  * Start a query builder chain for the given table.
  * Drop-in replacement for `supabase.from(tableName)`.
  */
@@ -438,7 +452,7 @@ export class QueryBuilder {
     for (const row of rows) {
       const placeholders = cols.map((c, i) => `$${allParams.length + i + 1}`);
       valueSets.push(`(${placeholders.join(', ')})`);
-      cols.forEach((c) => allParams.push(row[c]));
+      cols.forEach((c) => allParams.push(pgValue(row[c])));
     }
 
     const returningCols = this._insertSelect || '*';
@@ -457,7 +471,7 @@ export class QueryBuilder {
 
     const cols = Object.keys(this._updateData);
     const setClauses = cols.map((c, i) => `"${c}" = $${i + 1}`);
-    const setParams = cols.map((c) => this._updateData![c]);
+    const setParams = cols.map((c) => pgValue(this._updateData![c]));
 
     const { clause, params: whereParams } = this._buildWhere(setParams.length + 1);
     const allParams = [...setParams, ...whereParams];
@@ -491,7 +505,7 @@ export class QueryBuilder {
     for (const row of rows) {
       const placeholders = cols.map((_, i) => `$${allParams.length + i + 1}`);
       valueSets.push(`(${placeholders.join(', ')})`);
-      cols.forEach((c) => allParams.push(row[c]));
+      cols.forEach((c) => allParams.push(pgValue(row[c])));
     }
 
     const updateCols = cols

@@ -2,8 +2,11 @@ import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import { from } from "../lib/dbShim";
 import { getPool } from "../lib/db";
+import { encryptApiKey, maskApiKey } from "../lib/crypto";
 
 export const userRouter = Router();
+
+const API_KEY_FIELDS = ["claude_api_key", "gemini_api_key", "openai_api_key"] as const;
 
 // GET /user/profile
 userRouter.get("/profile", requireAuth, async (_req, res) => {
@@ -27,7 +30,13 @@ userRouter.get("/profile", requireAuth, async (_req, res) => {
       openai_api_key: null,
     });
   }
-  res.json(data);
+
+  // Mask API keys — never send full keys to the browser
+  const safe = { ...data };
+  for (const field of API_KEY_FIELDS) {
+    safe[field] = maskApiKey(data[field]);
+  }
+  res.json(safe);
 });
 
 // PATCH /user/profile
@@ -40,8 +49,35 @@ userRouter.patch("/profile", requireAuth, async (req, res) => {
   ];
   const updates: Record<string, any> = { updated_at: new Date().toISOString() };
   for (const key of allowed) {
-    if (key in req.body) updates[key] = req.body[key];
+    if (key in req.body) {
+      let val = req.body[key];
+      // Encrypt API keys before storing
+      if (API_KEY_FIELDS.includes(key as any) && typeof val === "string" && val.trim()) {
+        // Don't re-encrypt if the value is masked (user didn't change it)
+        if (val.includes("•")) continue;
+        val = encryptApiKey(val.trim());
+      }
+      updates[key] = val;
+    }
   }
+
+  // Upsert: ensure profile row exists before update
+  try {
+    const pool = await getPool();
+    const existing = await pool.query(
+      'SELECT id FROM user_profiles WHERE user_id = $1',
+      [userId],
+    );
+    if (existing.rows.length === 0) {
+      await pool.query(
+        'INSERT INTO user_profiles (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING',
+        [userId],
+      );
+    }
+  } catch (err: any) {
+    return void res.status(500).json({ detail: err.message });
+  }
+
   const { error } = await from("user_profiles")
     .update(updates)
     .eq("user_id", userId);
@@ -73,4 +109,3 @@ userRouter.delete("/account", requireAuth, async (_req, res) => {
     res.status(500).json({ detail: err.message });
   }
 });
-

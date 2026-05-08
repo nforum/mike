@@ -13,6 +13,7 @@
     "@aws-sdk/client-s3": "^3.787.0",
     "@aws-sdk/s3-request-presigner": "^3.787.0",
     "@google-cloud/cloud-sql-connector": "^1.10.0",
+    "@google-cloud/storage": "^7.19.0",
     "@google/genai": "^1.50.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@supabase/supabase-js": "^2.49.4",
@@ -31,7 +32,8 @@
     "openai": "^6.35.0",
     "pdfjs-dist": "^4.10.38",
     "pg": "^8.20.0",
-    "resend": "^4.5.1"
+    "resend": "^4.5.1",
+    "word-extractor": "^1.0.4"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

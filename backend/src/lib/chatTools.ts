@@ -1286,17 +1286,37 @@ async function readDocumentContent(
                     `[read_document] docx mammoth fallback length=${text.length} for filename="${docInfo.filename}"`,
                 );
             }
+        } else if (docInfo.file_type === "doc") {
+            // Legacy .doc (OLE binary) — use word-extractor
+            console.log(
+                `[read_document] doc (OLE) using word-extractor for filename="${docInfo.filename}"`,
+            );
+            const WordExtractor = (await import("word-extractor")).default;
+            const extractor = new WordExtractor();
+            const doc = await extractor.extract(Buffer.from(raw));
+            text = doc.getBody();
+            console.log(
+                `[read_document] word-extractor length=${text.length} for filename="${docInfo.filename}"`,
+            );
         } else {
             console.log(
-                `[read_document] unknown file_type="${docInfo.file_type}" for filename="${docInfo.filename}", trying mammoth`,
+                `[read_document] unknown file_type="${docInfo.file_type}" for filename="${docInfo.filename}", trying mammoth then word-extractor`,
             );
-            const mammoth = await import("mammoth");
-            const result = await mammoth.extractRawText({
-                buffer: Buffer.from(raw),
-            });
-            text = result.value;
+            try {
+                const mammoth = await import("mammoth");
+                const result = await mammoth.extractRawText({
+                    buffer: Buffer.from(raw),
+                });
+                text = result.value;
+            } catch {
+                // mammoth failed — try word-extractor (handles OLE .doc)
+                const WordExtractor = (await import("word-extractor")).default;
+                const extractor = new WordExtractor();
+                const doc = await extractor.extract(Buffer.from(raw));
+                text = doc.getBody();
+            }
             console.log(
-                `[read_document] mammoth length=${text.length} for filename="${docInfo.filename}"`,
+                `[read_document] fallback extractor length=${text.length} for filename="${docInfo.filename}"`,
             );
         }
         console.log(
