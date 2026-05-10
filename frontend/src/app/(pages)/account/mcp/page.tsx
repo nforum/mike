@@ -9,12 +9,15 @@ import {
     Plus,
     Trash2,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useConfirmDialog } from "@/app/components/modals/confirm-dialog";
 import {
     createMcpServer,
     deleteMcpServer,
     listMcpServers,
+    resetMcpOauth,
     startMcpOauth,
     testMcpServer,
     updateMcpServer,
@@ -53,6 +56,10 @@ export default function McpServersPage() {
         Record<string, McpServerTestResult>
     >({});
 
+    const { confirm, alert, dialog } = useConfirmDialog();
+    const t = useTranslations("connectors");
+    const tc = useTranslations("common");
+
     const reload = useCallback(async () => {
         setLoadError(null);
         try {
@@ -74,7 +81,7 @@ export default function McpServersPage() {
         const name = draft.name.trim();
         const url = draft.url.trim();
         if (!name || !url) {
-            setAddError("Name and URL are required.");
+            setAddError(t("addForm.nameUrlRequired"));
             return;
         }
         const headers: Record<string, string> = {};
@@ -119,7 +126,10 @@ export default function McpServersPage() {
                 return;
             }
             if (!authorize_url) {
-                alert("Authorization server did not return a URL.");
+                await alert({
+                    title: t("alerts.signInUnavailable"),
+                    message: t("alerts.noAuthorizeUrl"),
+                });
                 return;
             }
             const popup = window.open(
@@ -128,9 +138,11 @@ export default function McpServersPage() {
                 "width=600,height=720,menubar=no,toolbar=no,location=no",
             );
             if (!popup) {
-                alert(
-                    "Couldn't open the sign-in window — check your popup blocker.",
-                );
+                await alert({
+                    title: t("alerts.popupBlocked"),
+                    message:
+                        t("alerts.popupBlockedMessage"),
+                });
                 return;
             }
             // Poll the row until tokens are saved, or until the popup closes
@@ -160,7 +172,10 @@ export default function McpServersPage() {
                 }
             }, 1500);
         } catch (err) {
-            alert(err instanceof Error ? err.message : "Sign-in failed");
+            await alert({
+                title: t("alerts.signInFailed"),
+                message: err instanceof Error ? err.message : t("alerts.signInFailed"),
+            });
         }
     };
 
@@ -192,17 +207,31 @@ export default function McpServersPage() {
             // immediately if the server still works after re-enabling.
             if (wasDisabled) void runAutoTest(server.id);
         } catch (err) {
-            alert(err instanceof Error ? err.message : "Failed to update");
+            await alert({
+                title: t("alerts.updateFailed"),
+                message:
+                    err instanceof Error ? err.message : t("alerts.failedToUpdate"),
+            });
         }
     };
 
     const handleDelete = async (server: McpServer) => {
-        if (!confirm(`Remove connector "${server.name}"?`)) return;
+        const ok = await confirm({
+            title: t("confirm.removeTitle"),
+            message: t("confirm.removeMessage", { name: server.name }),
+            confirmLabel: t("confirm.removeConfirm"),
+            destructive: true,
+        });
+        if (!ok) return;
         try {
             await deleteMcpServer(server.id);
             await reload();
         } catch (err) {
-            alert(err instanceof Error ? err.message : "Failed to delete");
+            await alert({
+                title: t("alerts.deleteFailed"),
+                message:
+                    err instanceof Error ? err.message : t("alerts.failedToDelete"),
+            });
         }
     };
 
@@ -226,12 +255,39 @@ export default function McpServersPage() {
         }
     };
 
+    const handleResetAndSignIn = async (server: McpServer) => {
+        const ok = await confirm({
+            title: t("confirm.resetOauthTitle"),
+            message: t("confirm.resetOauthMessage", { name: server.name }),
+            confirmLabel: t("confirm.resetOauthConfirm"),
+        });
+        if (!ok) return;
+        try {
+            await resetMcpOauth(server.id);
+            // Drop any stale per-card state then re-render via reload.
+            setTestResults((r) => {
+                const next = { ...r };
+                delete next[server.id];
+                return next;
+            });
+            await reload();
+            void launchOAuth(server.id);
+        } catch (err) {
+            await alert({
+                title: t("alerts.resetFailed"),
+                message:
+                    err instanceof Error ? err.message : t("alerts.failedToResetOauth"),
+            });
+        }
+    };
+
     return (
         <div className="space-y-4">
+            {dialog}
             <div className="pb-2">
                 <div className="flex items-center justify-between mb-2">
                     <h2 className="text-2xl font-medium font-serif">
-                        Connectors
+                        {t("title")}
                     </h2>
                     <Button
                         onClick={() => setShowAdd((v) => !v)}
@@ -240,11 +296,11 @@ export default function McpServersPage() {
                     >
                         {showAdd ? (
                             <>
-                                <ChevronUp className="h-4 w-4" /> Hide form
+                                <ChevronUp className="h-4 w-4" /> {t("hideForm")}
                             </>
                         ) : (
                             <>
-                                <Plus className="h-4 w-4" /> Add connector
+                                <Plus className="h-4 w-4" /> {t("addConnector")}
                             </>
                         )}
                     </Button>
@@ -276,7 +332,7 @@ export default function McpServersPage() {
                 <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
                 <div>
                     <p className="font-medium">
-                        Only add connectors you trust
+                        {t("trustWarning.title")}
                     </p>
                     <p className="text-xs mt-1 leading-relaxed">
                         A connector&rsquo;s operator can see anything Mike
@@ -303,8 +359,7 @@ export default function McpServersPage() {
 
             {loading ? (
                 <div className="flex items-center gap-2 text-gray-500 py-6">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Loading
-                    servers&hellip;
+                    <Loader2 className="h-4 w-4 animate-spin" /> {t("loadingServers")}
                 </div>
             ) : loadError ? (
                 <div className="text-red-600 text-sm flex items-center gap-2">
@@ -313,7 +368,7 @@ export default function McpServersPage() {
                 </div>
             ) : servers.length === 0 ? (
                 <div className="text-sm text-gray-500 border border-dashed border-gray-200 rounded-md py-6 text-center">
-                    No connectors configured yet.
+                    {t("noConnectors")}
                 </div>
             ) : (
                 <div className="space-y-3">
@@ -327,6 +382,7 @@ export default function McpServersPage() {
                             onDelete={() => handleDelete(s)}
                             onTest={() => handleTest(s)}
                             onSignIn={() => launchOAuth(s.id)}
+                            onResetOauth={() => handleResetAndSignIn(s)}
                         />
                     ))}
                 </div>
@@ -348,6 +404,8 @@ function AddForm({
     saving: boolean;
     error: string | null;
 }) {
+    const t = useTranslations("connectors");
+    const tc = useTranslations("common");
     const updateHeader = (idx: number, patch: Partial<DraftHeader>) => {
         const headers = draft.headers.map((h, i) =>
             i === idx ? { ...h, ...patch } : h,
@@ -368,9 +426,9 @@ function AddForm({
     return (
         <div className="border border-gray-200 rounded-md p-4 space-y-3 bg-gray-50">
             <div>
-                <label className="text-sm text-gray-600 block mb-1">Name</label>
+                <label className="text-sm text-gray-600 block mb-1">{t("addForm.name")}</label>
                 <Input
-                    placeholder="My connector"
+                    placeholder={t("addForm.namePlaceholder")}
                     value={draft.name}
                     onChange={(e) =>
                         setDraft({ ...draft, name: e.target.value })
@@ -378,9 +436,9 @@ function AddForm({
                 />
             </div>
             <div>
-                <label className="text-sm text-gray-600 block mb-1">URL</label>
+                <label className="text-sm text-gray-600 block mb-1">{t("addForm.url")}</label>
                 <Input
-                    placeholder="https://example.com/mcp"
+                    placeholder={t("addForm.urlPlaceholder")}
                     value={draft.url}
                     onChange={(e) =>
                         setDraft({ ...draft, url: e.target.value })
@@ -389,7 +447,7 @@ function AddForm({
             </div>
             <div>
                 <label className="text-sm text-gray-600 block mb-1">
-                    Authentication
+                    {t("addForm.authentication")}
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <button
@@ -403,10 +461,9 @@ function AddForm({
                                 : "border-gray-200 bg-white hover:bg-gray-50"
                         }`}
                     >
-                        <div className="font-medium">API key / headers</div>
+                        <div className="font-medium">{t("addForm.apiKeyHeaders")}</div>
                         <div className="text-xs text-gray-500 mt-0.5">
-                            For servers that accept a static token. You paste
-                            it as a custom header below.
+                            {t("addForm.apiKeyHeadersDesc")}
                         </div>
                     </button>
                     <button
@@ -420,10 +477,9 @@ function AddForm({
                                 : "border-gray-200 bg-white hover:bg-gray-50"
                         }`}
                     >
-                        <div className="font-medium">OAuth (auto-discover)</div>
+                        <div className="font-medium">{t("addForm.oauthDiscover")}</div>
                         <div className="text-xs text-gray-500 mt-0.5">
-                            For spec-conformant servers. You&rsquo;ll sign in
-                            via a popup &mdash; no token to paste.
+                            {t("addForm.oauthDiscoverDesc")}
                         </div>
                     </button>
                 </div>
@@ -431,7 +487,7 @@ function AddForm({
             {draft.auth_type === "headers" && (
             <div>
                 <label className="text-sm text-gray-600 block mb-1">
-                    Custom headers (optional)
+                    {t("addForm.customHeaders")}
                 </label>
                 <p className="text-xs text-gray-400 mb-2">
                     Sent on every request. Common usage:{" "}
@@ -448,7 +504,7 @@ function AddForm({
                     {draft.headers.map((h, idx) => (
                         <div key={idx} className="flex gap-2">
                             <Input
-                                placeholder="Header name"
+                                placeholder={t("addForm.headerName")}
                                 value={h.key}
                                 onChange={(e) =>
                                     updateHeader(idx, { key: e.target.value })
@@ -456,7 +512,7 @@ function AddForm({
                                 className="flex-1"
                             />
                             <Input
-                                placeholder="Value"
+                                placeholder={tc("name")}
                                 value={h.value}
                                 onChange={(e) =>
                                     updateHeader(idx, {
@@ -471,7 +527,7 @@ function AddForm({
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => removeHeaderRow(idx)}
-                                aria-label="Remove header"
+                                aria-label={t("addForm.removeHeader")}
                             >
                                 <Trash2 className="h-4 w-4" />
                             </Button>
@@ -484,7 +540,7 @@ function AddForm({
                         onClick={addHeaderRow}
                         className="gap-1"
                     >
-                        <Plus className="h-3 w-3" /> Add header
+                        <Plus className="h-3 w-3" /> {t("addForm.addHeader")}
                     </Button>
                 </div>
             </div>
@@ -504,12 +560,12 @@ function AddForm({
                     {saving ? (
                         <>
                             <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                            Saving&hellip;
+                            {tc("saving")}
                         </>
                     ) : draft.auth_type === "oauth" ? (
-                        "Save & sign in"
+                        t("addForm.saveAndSignIn")
                     ) : (
-                        "Save connector"
+                        t("addForm.saveConnector")
                     )}
                 </Button>
             </div>
@@ -525,7 +581,7 @@ function AddForm({
  */
 function safeServerName(raw: string): string {
     const trimmed = raw.trim();
-    if (!trimmed) return "Untitled connector";
+    if (!trimmed) return "__UNTITLED__";
     const looksLikeSecret =
         /\b(?:Bearer|Basic|sk-[A-Za-z0-9_-]{8,}|sb_secret_|AIza[A-Za-z0-9_-]{20,})\b/i.test(
             trimmed,
@@ -555,6 +611,7 @@ function ServerCard({
     onDelete,
     onTest,
     onSignIn,
+    onResetOauth,
 }: {
     server: McpServer;
     testing: boolean;
@@ -563,10 +620,13 @@ function ServerCard({
     onDelete: () => void;
     onTest: () => void;
     onSignIn: () => void;
+    onResetOauth: () => void;
 }) {
+    const t = useTranslations("connectors");
+    const tc = useTranslations("common");
     const [showDetails, setShowDetails] = useState(false);
-    const displayName = safeServerName(server.name);
-    const nameWasSanitized = displayName !== server.name.trim();
+    const displayName = safeServerName(server.name).replace("__UNTITLED__", t("card.untitledConnector"));
+    const nameWasSanitized = displayName !== server.name.trim() && displayName !== t("card.untitledConnector");
     const needsSignIn =
         server.auth_type === "oauth" && !server.oauth_authorized;
 
@@ -588,32 +648,31 @@ function ServerCard({
                                 }`}
                             >
                                 {server.oauth_authorized
-                                    ? "OAuth · signed in"
-                                    : "OAuth · sign-in required"}
+                                    ? t("card.oauthSignedIn")
+                                    : t("card.oauthRequired")}
                             </span>
                         )}
                         {server.enabled ? (
                             <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                                Enabled
+                                {t("card.enabled")}
                             </span>
                         ) : (
                             <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
                                 <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-                                Disabled
+                                {t("card.disabled")}
                             </span>
                         )}
                         {server.last_error && server.last_error !== "reauth_required" && (
                             <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
                                 <AlertCircle className="h-3 w-3" />
-                                Error
+                                {tc("error")}
                             </span>
                         )}
                     </div>
                     {nameWasSanitized && (
                         <p className="text-xs text-amber-700 mt-1">
-                            Name contained what looks like a secret &mdash;
-                            displayed redacted. Edit the server to fix.
+                            {t("card.nameContainedSecret")}
                         </p>
                     )}
                     <a
@@ -626,7 +685,7 @@ function ServerCard({
                     </a>
                     {server.header_keys.length > 0 && (
                         <div className="text-xs text-gray-400 mt-1 flex flex-wrap gap-1">
-                            <span>Headers:</span>
+                            <span>{t("card.headers")}</span>
                             {server.header_keys.map((k) => (
                                 <span
                                     key={k}
@@ -645,7 +704,7 @@ function ServerCard({
                             onClick={onSignIn}
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                         >
-                            Sign in
+                            {t("card.signIn")}
                         </Button>
                     ) : (
                         <Button
@@ -657,18 +716,18 @@ function ServerCard({
                             {testing ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             ) : (
-                                "Test"
+                                tc("test")
                             )}
                         </Button>
                     )}
                     <Button variant="outline" size="sm" onClick={onToggle}>
-                        {server.enabled ? "Disable" : "Enable"}
+                        {server.enabled ? tc("disable") : tc("enable")}
                     </Button>
                     <Button
                         variant="ghost"
                         size="icon"
                         onClick={onDelete}
-                        aria-label="Delete server"
+                        aria-label={t("card.deleteServer")}
                     >
                         <Trash2 className="h-4 w-4" />
                     </Button>
@@ -680,16 +739,45 @@ function ServerCard({
                 <div className="px-4 py-2 text-xs bg-red-50 text-red-700 border-t border-red-100 flex items-start gap-2">
                     <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                     <span className="break-words">
-                        {testResult.error ?? "Unknown error"}
+                        {testResult.error ?? t("card.unknownError")}
                     </span>
                 </div>
             )}
             {server.last_error && !testResult && (
                 <div className="px-4 py-2 text-xs bg-red-50 text-red-700 border-t border-red-100 flex items-start gap-2">
                     <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    <span className="break-words">{server.last_error}</span>
+                    <span className="break-words flex-1">
+                        {server.last_error}
+                    </span>
+                    {server.auth_type === "oauth" && (
+                        <button
+                            type="button"
+                            onClick={onResetOauth}
+                            className="text-red-700 underline hover:text-red-900 shrink-0"
+                        >
+                            {t("confirm.resetOauth")}
+                        </button>
+                    )}
                 </div>
             )}
+            {/* Surface a Reset link even without last_error when the connector
+                has cached DCR but no tokens — that's the "Client Not Registered"
+                stuck state where the user needs to nuke metadata to make Sign in
+                actually work. */}
+            {!server.last_error &&
+                server.auth_type === "oauth" &&
+                !server.oauth_authorized &&
+                testResult?.ok === false && (
+                    <div className="px-4 py-2 text-xs bg-amber-50 text-amber-800 border-t border-amber-100 flex items-center justify-end">
+                        <button
+                            type="button"
+                            onClick={onResetOauth}
+                            className="underline hover:text-amber-900"
+                        >
+                            {t("confirm.resetOauthTryAgain")}
+                        </button>
+                    </div>
+                )}
 
             {/* Tool list */}
             {testResult?.ok && testResult.tools && testResult.tools.length > 0 && (
@@ -701,11 +789,10 @@ function ServerCard({
                     >
                         <span className="flex items-center gap-2">
                             <Check className="h-3.5 w-3.5 text-green-600" />
-                            Discovered {testResult.tool_count ?? 0} tool
-                            {testResult.tool_count === 1 ? "" : "s"}
+                            {t("card.discoveredTools", { count: testResult.tool_count ?? 0 })}
                         </span>
                         <span className="text-gray-400">
-                            {showDetails ? "Hide" : "Show"}
+                            {showDetails ? t("card.hide") : t("card.show")}
                         </span>
                     </button>
                     {showDetails && (

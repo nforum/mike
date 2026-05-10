@@ -11,6 +11,7 @@ import {
     ChevronsUpDown,
     ChevronDown,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/contexts/UserProfileContext";
 import { useChatHistoryContext } from "@/app/contexts/ChatHistoryContext";
@@ -18,13 +19,14 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { MikeIcon } from "@/components/chat/mike-icon";
 import { SidebarChatItem } from "@/app/components/shared/SidebarChatItem";
+import { LanguageSwitcher } from "@/app/components/shared/LanguageSwitcher";
 import { listProjects } from "@/app/lib/mikeApi";
 
 const NAV_ITEMS = [
-    { href: "/assistant", label: "Assistant", icon: MessageSquare },
-    { href: "/projects", label: "Projects", icon: FolderOpen },
-    { href: "/tabular-reviews", label: "Tabular Review", icon: Table2 },
-    { href: "/workflows", label: "Workflows", icon: Library },
+    { href: "/assistant", labelKey: "assistant" as const, icon: MessageSquare },
+    { href: "/projects", labelKey: "projects" as const, icon: FolderOpen },
+    { href: "/tabular-reviews", labelKey: "tabularReview" as const, icon: Table2 },
+    { href: "/workflows", labelKey: "workflows" as const, icon: Library },
 ];
 
 interface AppSidebarProps {
@@ -38,6 +40,7 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
     const { chats, currentChatId, setCurrentChatId } = useChatHistoryContext();
     const router = useRouter();
     const pathname = usePathname();
+    const t = useTranslations("sidebar");
     const [shouldAnimate, setShouldAnimate] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [historyCollapsed, setHistoryCollapsed] = useState(false);
@@ -113,7 +116,7 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
                 isOpen
                     ? "w-64 h-dvh bg-gray-50 border-r"
                     : "w-14 md:h-dvh md:bg-gray-50 md:border-r h-auto bg-transparent"
-            } border-gray-200 flex flex-col transition-all duration-300 absolute md:relative z-99 overflow-visible`}
+            } border-gray-200 flex flex-col transition-all duration-300 absolute md:relative z-[99] overflow-visible`}
         >
             {/* Toggle + Logo */}
             <div
@@ -141,16 +144,17 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
                 <button
                     onClick={onToggle}
                     className="h-9 w-9 p-2.5 items-center flex hover:bg-gray-100 rounded-md transition-colors"
-                    title={isOpen ? "Close sidebar" : "Open sidebar"}
+                    title={isOpen ? t("closeSidebar") : t("openSidebar")}
                 >
                     <PanelLeft className="h-4 w-4" />
                 </button>
             </div>
 
             {/* Nav items */}
-            {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+            {NAV_ITEMS.map(({ href, labelKey, icon: Icon }) => {
                 const isActive =
                     pathname === href || pathname.startsWith(href + "/");
+                const label = t(labelKey);
                 return (
                     <div key={href} className="py-1 px-2.5">
                         <button
@@ -190,7 +194,7 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
                             shouldAnimate ? "sidebar-fade-in" : ""
                         }`}
                     >
-                        <span>Assistant History</span>
+                        <span>{t("assistantHistory")}</span>
                         <ChevronDown
                             className={`h-3.5 w-3.5 transition-transform ${historyCollapsed ? "-rotate-90" : ""}`}
                         />
@@ -218,7 +222,7 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
                                     shouldAnimate ? "sidebar-fade-in-2" : ""
                                 }`}
                             >
-                                No chats yet
+                                {t("noChatsYet")}
                             </div>
                         ) : (
                             <div
@@ -299,8 +303,9 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
                                     className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 rounded-md"
                                 >
                                     <User className="h-4 w-4" />
-                                    Account Settings
+                                    {t("accountSettings")}
                                 </button>
+                                <LanguageSwitcher />
                             </div>
                         )}
                     </div>

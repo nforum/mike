@@ -271,19 +271,40 @@ documentsRouter.get("/:documentId/docx", requireAuth, async (req, res) => {
     .select("id, filename, user_id, project_id")
     .eq("id", documentId)
     .single();
-  if (error || !doc)
+  if (error || !doc) {
+    console.warn(`[docx] document ${documentId} not found:`, error);
     return void res.status(404).json({ detail: "Document not found" });
+  }
   const access = await ensureDocAccess(doc, userId, userEmail, db);
-  if (!access.ok)
+  if (!access.ok) {
+    console.warn(`[docx] access denied for ${documentId} user=${userId}`);
     return void res.status(404).json({ detail: "Document not found" });
+  }
 
   const active = await loadActiveVersion(documentId, db, versionIdParam);
-  if (!active)
-    return void res.status(404).json({ detail: "No file available" });
+  if (!active) {
+    console.warn(
+      `[docx] no active version for doc=${documentId} requested_version=${versionIdParam}`,
+    );
+    return void res
+      .status(404)
+      .json({ detail: "No file available", document_id: documentId, version_id: versionIdParam });
+  }
 
+  console.log(
+    `[docx] serving doc=${documentId} version=${active.id} path=${active.storage_path}`,
+  );
   const raw = await downloadFile(active.storage_path);
-  if (!raw)
-    return void res.status(404).json({ detail: "Document bytes not available" });
+  if (!raw) {
+    console.warn(
+      `[docx] GCS miss for doc=${documentId} version=${active.id} path=${active.storage_path}`,
+    );
+    return void res.status(404).json({
+      detail: "Document bytes not available",
+      version_id: active.id,
+      storage_path: active.storage_path,
+    });
+  }
 
   res.setHeader(
     "Content-Type",

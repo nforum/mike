@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { SiteLogo } from "@/components/site-logo";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,6 +11,7 @@ import { startAuthorizationFlow } from "@/lib/oauth";
 export default function LoginPage() {
     const router = useRouter();
     const { isAuthenticated, authLoading } = useAuth();
+    const t = useTranslations("login");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -55,11 +57,11 @@ export default function LoginPage() {
                 <div className="bg-white border border-gray-200 rounded-2xl p-8">
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-left text-2xl font-serif">
-                            Log In
+                            {t("title")}
                         </h2>
                         <div className="bg-gray-100 p-1 rounded-md flex text-xs font-medium">
                             <span className="text-gray-600 px-3 py-1 bg-white rounded-sm shadow-sm">
-                                Log in
+                                {t("logIn")}
                             </span>
                             <a
                                 href="https://eulex.ai/signup"
@@ -67,7 +69,7 @@ export default function LoginPage() {
                                 rel="noopener noreferrer"
                                 className="px-3 py-1 text-gray-500 hover:text-gray-900"
                             >
-                                Sign up
+                                {t("signUp")}
                             </a>
                         </div>
                     </div>
@@ -81,17 +83,17 @@ export default function LoginPage() {
                         {loading ? (
                             <span className="flex items-center gap-2">
                                 <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                                Redirecting...
+                                {t("redirecting")}
                             </span>
                         ) : (
-                            "Sign in with EULEX"
+                            t("signInWithEulex")
                         )}
                     </Button>
 
                     {/* Divider */}
                     <div className="flex items-center gap-3 my-5">
                         <div className="flex-1 h-px bg-gray-200" />
-                        <span className="text-xs text-gray-400 uppercase">or continue with</span>
+                        <span className="text-xs text-gray-400 uppercase">{t("orContinueWith")}</span>
                         <div className="flex-1 h-px bg-gray-200" />
                     </div>
 
@@ -119,7 +121,7 @@ export default function LoginPage() {
                                     fill="#EA4335"
                                 />
                             </svg>
-                            Google
+                            {t("google")}
                         </button>
                         <button
                             onClick={() => handleSocialLogin("linkedin")}
@@ -128,7 +130,7 @@ export default function LoginPage() {
                             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#0A66C2">
                                 <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
                             </svg>
-                            LinkedIn
+                            {t("linkedIn")}
                         </button>
                     </div>
 
@@ -140,14 +142,14 @@ export default function LoginPage() {
 
                     {/* Info text */}
                     <p className="mt-5 text-center text-xs text-gray-400">
-                        Sign in with your EULEX account. Don&apos;t have one?{" "}
+                        {t("noAccount")}{" "}
                         <a
                             href="https://eulex.ai/signup"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:underline"
                         >
-                            Create account
+                            {t("createAccount")}
                         </a>
                     </p>
                 </div>

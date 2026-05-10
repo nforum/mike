@@ -1,0 +1,547 @@
+{
+  "common": {
+    "save": "Spremi",
+    "saving": "Spremanje...",
+    "saved": "Spremljeno",
+    "cancel": "Odustani",
+    "close": "Zatvori",
+    "delete": "Obriši",
+    "actions": "Radnje",
+    "loading": "Učitavanje",
+    "error": "Pogreška",
+    "enable": "Omogući",
+    "disable": "Onemogući",
+    "test": "Testiraj",
+    "search": "Pretraži",
+    "name": "Naziv",
+    "email": "E-pošta",
+    "rename": "Preimenuj"
+  },
+  "sidebar": {
+    "assistant": "Asistent",
+    "projects": "Predmeti",
+    "tabularReview": "Tablični pregled",
+    "workflows": "Radni tijekovi",
+    "account": "Račun",
+    "accountSettings": "Postavke računa",
+    "signOut": "Odjava",
+    "signIn": "Prijava",
+    "assistantHistory": "Povijest razgovora",
+    "noChatsYet": "Još nema razgovora",
+    "closeSidebar": "Zatvori bočnu traku",
+    "openSidebar": "Otvori bočnu traku"
+  },
+  "login": {
+    "title": "Prijava",
+    "logIn": "Prijava",
+    "signUp": "Registracija",
+    "signInWithEulex": "Prijavite se putem EULEX-a",
+    "redirecting": "Preusmjeravanje...",
+    "orContinueWith": "ili nastavite putem",
+    "google": "Google",
+    "linkedIn": "LinkedIn",
+    "noAccount": "Prijavite se s vašim EULEX računom. Nemate ga?",
+    "createAccount": "Otvorite račun"
+  },
+  "signup": {
+    "title": "Otvorite račun",
+    "logIn": "Prijava",
+    "signUp": "Registracija",
+    "managedByEulex": "Registracija računa odvija se putem EULEX-a",
+    "createOnEulex": "Otvorite besplatni račun na eulex.ai, zatim se vratite ovdje za prijavu.",
+    "createAccountOnEulex": "Otvorite račun na EULEX-u",
+    "alreadyHaveAccount": "Već imate račun?",
+    "signIn": "Prijavite se"
+  },
+  "account": {
+    "settings": "Postavke",
+    "tabs": {
+      "general": "Općenito",
+      "models": "Modeli i API ključevi",
+      "connectors": "Konektori"
+    },
+    "profile": {
+      "title": "Profil",
+      "displayName": "Ime za prikaz",
+      "displayNamePlaceholder": "Unesite vaše ime",
+      "organisation": "Organizacija",
+      "organisationPlaceholder": "Unesite naziv organizacije",
+      "email": "E-pošta"
+    },
+    "plan": {
+      "title": "Plan korištenja",
+      "free": "Besplatno"
+    },
+    "actions": {
+      "title": "Radnje",
+      "signOut": "Odjava"
+    },
+    "danger": {
+      "title": "Opasna zona",
+      "description": "Trajno obrišite svoj račun i sve povezane podatke. Ova se radnja ne može poništiti.",
+      "confirmMessage": "Jeste li sigurni? Ovo će trajno obrisati vaš račun.",
+      "deleteAccount": "Obriši račun",
+      "deleting": "Brisanje…"
+    },
+    "alerts": {
+      "failedDeleteAccount": "Brisanje računa nije uspjelo. Pokušajte ponovo.",
+      "failedUpdateName": "Ažuriranje imena nije uspjelo. Pokušajte ponovo.",
+      "failedUpdateOrg": "Ažuriranje organizacije nije uspjelo. Pokušajte ponovo."
+    }
+  },
+  "models": {
+    "title": "Postavke modela",
+    "tabularModel": "Model za tablični pregled",
+    "localLlmNote": "LocalLLM modeli su konfigurirani od strane administratora servera i dostupni svim korisnicima.",
+    "selectModel": "Odaberite model",
+    "apiKeys": {
+      "title": "API ključevi",
+      "description": "Morate unijeti vlastite API ključeve kako bi aplikacija radila ili dodati API ključeve u .env datoteku ako koristite vlastitu instancu Mike-a.",
+      "titleGenNote": "Generiranje naslova automatski koristi najjeftiniji model od konfiguriranog pružatelja usluga (LocalLLM Lite ako je dostupan, inače Gemini Flash Lite, inače Claude Haiku).",
+      "anthropic": "Anthropic (Claude) API ključ",
+      "google": "Google (Gemini) API ključ",
+      "openai": "OpenAI API ključ",
+      "mistral": "Mistral AI API ključ",
+      "addKeyTooltip": "Dodajte {provider} API ključ za korištenje ovog modela",
+      "failedSave": "Spremanje {label} nije uspjelo."
+    }
+  },
+  "connectors": {
+    "title": "Konektori",
+    "hideForm": "Sakrij obrazac",
+    "addConnector": "Dodaj konektor",
+    "description": "Konektori povezuju vanjske alate s Mike-om putem Model Context Protocola (MCP) — pravne baze podataka, web istraživanje, interne API-je organizacije i drugo. Alati otkriveni iz svakog konektora postaju dostupni chat asistentu.",
+    "trustWarning": {
+      "title": "Dodajte samo konektore kojima vjerujete",
+      "description": "Operator konektora može vidjeti sve što Mike šalje u pozivima alata — vaše upite, isječke dokumenata i odgovor samog alata. Prilagođena zaglavlja (uključujući Authorization tokene) šalju se sa svakim zahtjevom."
+    },
+    "loadingServers": "Učitavanje servera…",
+    "noConnectors": "Još nema konfiguriranih konektora.",
+    "addForm": {
+      "name": "Naziv",
+      "namePlaceholder": "Moj konektor",
+      "url": "URL",
+      "urlPlaceholder": "https://example.com/mcp",
+      "authentication": "Autentifikacija",
+      "apiKeyHeaders": "API ključ / zaglavlja",
+      "apiKeyHeadersDesc": "Za servere koji prihvaćaju statički token. Zalijepite ga kao prilagođeno zaglavlje ispod.",
+      "oauthDiscover": "OAuth (automatsko otkrivanje)",
+      "oauthDiscoverDesc": "Za servere sukladne specifikaciji. Prijavit ćete se putem skočnog prozora — bez lijepljenja tokena.",
+      "customHeaders": "Prilagođena zaglavlja (neobvezno)",
+      "customHeadersHint": "Šalju se sa svakim zahtjevom. Uobičajena upotreba: Authorization → Bearer <token>.",
+      "headerName": "Naziv zaglavlja",
+      "headerValue": "Vrijednost",
+      "addHeader": "Dodaj zaglavlje",
+      "saveAndSignIn": "Spremi i prijavi se",
+      "saveConnector": "Spremi konektor",
+      "nameUrlRequired": "Naziv i URL su obavezni.",
+      "removeHeader": "Ukloni zaglavlje"
+    },
+    "card": {
+      "oauthSignedIn": "OAuth · prijavljeno",
+      "oauthRequired": "OAuth · potrebna prijava",
+      "enabled": "Omogućeno",
+      "disabled": "Onemogućeno",
+      "signIn": "Prijava",
+      "headers": "Zaglavlja:",
+      "untitledConnector": "Konektor bez naziva",
+      "nameContainedSecret": "Naziv je sadržavao nešto nalik na tajnu — prikazano je maskirano. Uredite server da popravite.",
+      "unknownError": "Nepoznata pogreška",
+      "discoveredTools": "Otkriveno {count} alat{count, plural, one {} few {a} other {a}}",
+      "hide": "Sakrij",
+      "show": "Prikaži",
+      "deleteServer": "Obriši server"
+    },
+    "confirm": {
+      "removeTitle": "Ukloni konektor",
+      "removeMessage": "Jeste li sigurni da želite ukloniti \"{name}\"? Ovo također briše sve spremljene tokene za prijavu.",
+      "removeConfirm": "Ukloni",
+      "resetOauthTitle": "Resetiraj OAuth i prijavi se ponovo",
+      "resetOauthMessage": "Ovo briše spremljene tokene i ponovo registrira Mike s \"{name}\" od nule. Koristite kada je konektor zapeo na \"Client Not Registered\" ili odbija osvježavanje. Bit ćete upitani za ponovnu prijavu.",
+      "resetOauthConfirm": "Resetiraj i prijavi se",
+      "resetOauth": "Resetiraj OAuth",
+      "resetOauthTryAgain": "Resetiraj OAuth i pokušaj ponovo"
+    },
+    "alerts": {
+      "signInUnavailable": "Prijava nedostupna",
+      "noAuthorizeUrl": "Autorizacijski server nije vratio URL.",
+      "popupBlocked": "Skočni prozor blokiran",
+      "popupBlockedMessage": "Nije moguće otvoriti prozor za prijavu — provjerite blokator skočnih prozora i pokušajte ponovo.",
+      "signInFailed": "Prijava nije uspjela",
+      "updateFailed": "Ažuriranje nije uspjelo",
+      "deleteFailed": "Brisanje nije uspjelo",
+      "resetFailed": "Resetiranje nije uspjelo",
+      "failedToUpdate": "Ažuriranje nije uspjelo",
+      "failedToDelete": "Brisanje nije uspjelo",
+      "failedToResetOauth": "Resetiranje OAuth-a nije uspjelo"
+    }
+  },
+  "assistant": {
+    "greeting": "Pozdrav, {username}",
+    "disclaimer": "AI može pogriješiti. Odgovori ne predstavljaju pravni savjet.",
+    "placeholder": "Postavite pitanje o vašim dokumentima...",
+    "projects": "Predmeti",
+    "workflows": "Radni tijekovi",
+    "addDocuments": "Dodaj dokumente",
+    "openProjects": "Otvori predmete",
+    "openWorkflows": "Otvori radne tijekove"
+  },
+  "projects": {
+    "title": "Predmeti",
+    "searchPlaceholder": "Pretraži predmete…",
+    "tabs": {
+      "all": "Svi",
+      "mine": "Moji",
+      "sharedWithMe": "Podijeljeni sa mnom"
+    },
+    "columns": {
+      "name": "Naziv",
+      "cm": "CM",
+      "files": "Dokumenti",
+      "chats": "Razgovori",
+      "tabularReviews": "Tablični pregledi",
+      "created": "Datum izrade"
+    },
+    "empty": {
+      "title": "Predmeti",
+      "description": "Prenesite dokumente u predmete te započnite razgovore i tablične preglede s njima.",
+      "createNew": "+ Novi predmet",
+      "noProjects": "Nema {tab} predmeta"
+    },
+    "cmPlaceholder": "CM #",
+    "ownerOnlyDeleteWarning": "obrišete {count} od odabranih predmeta — samo vlasnik predmeta može obrisati predmet"
+  },
+  "modals": {
+    "creditsExhausted": {
+      "title": "Dosegnut limit poruka",
+      "message": "Dosegli ste svoj mjesečni limit od 100 poruka.",
+      "resetLabel": "Vaši krediti se resetiraju:",
+      "resetNote": "Vaši krediti za poruke automatski se resetiraju prvog dana svakog mjeseca."
+    },
+    "apiKeyRequired": {
+      "title": "Potreban API ključ",
+      "message": "Još niste dodali {provider} API ključ. Dodajte ga u postavkama računa za korištenje ovog modela.",
+      "goToSettings": "Idi na postavke računa"
+    }
+  },
+  "practices": {
+    "generalTransactions": "Opći poslovi",
+    "corporate": "Korporativno pravo",
+    "finance": "Financijsko pravo",
+    "litigation": "Parnični postupci",
+    "realEstate": "Nekretnine",
+    "tax": "Porezno pravo",
+    "employment": "Radno pravo",
+    "ip": "Intelektualno vlasništvo",
+    "competition": "Pravo tržišnog natjecanja",
+    "techTransactions": "Tehnološke transakcije",
+    "projectFinance": "Projektno financiranje",
+    "ecVc": "EC/VC",
+    "privateEquity": "Privatni kapital",
+    "privateCredit": "Privatni kredit",
+    "ecm": "Tržišta kapitala (ECM)",
+    "dcm": "Dužnički instrumenti (DCM)",
+    "levFin": "Financiranje s polugom",
+    "arbitration": "Arbitraža",
+    "others": "Ostalo"
+  },
+  "columnPresets": {
+    "parties": "Ugovorne strane",
+    "governingLaw": "Mjerodavno pravo",
+    "effectiveDate": "Datum stupanja na snagu",
+    "term": "Trajanje ugovora",
+    "termination": "Raskid ugovora",
+    "changeOfControl": "Promjena kontrole",
+    "confidentiality": "Povjerljivost",
+    "assignment": "Ustupanje (cesija)",
+    "paymentFees": "Plaćanje i naknade",
+    "amendment": "Izmjene i dopune",
+    "indemnity": "Naknada štete",
+    "warranties": "Jamstva i garancije",
+    "forceMajeure": "Viša sila"
+  },
+  "language": {
+    "label": "Jezik",
+    "en": "English",
+    "hr": "Hrvatski"
+  },
+  "ownerOnly": {
+    "defaultTitle": "Radnja ograničena na vlasnika",
+    "defaultMessage": "Samo vlasnik predmeta može izvršiti ovu radnju.",
+    "actionMessage": "Samo vlasnik predmeta može {action}.",
+    "askAccess": "Obratite se na {email} ako trebate pristup.",
+    "ok": "U redu"
+  },
+  "deleteChats": {
+    "title": "Obriši sve razgovore",
+    "successTitle": "Svi razgovori obrisani",
+    "successMessage": "Vaša povijest razgovora uspješno je obrisana.",
+    "confirmMessage": "Jeste li sigurni da želite obrisati svih {count} {count, plural, one {razgovor} few {razgovora} other {razgovora}}? Ova radnja je trajna i ne može se poništiti.",
+    "deleting": "Brisanje...",
+    "deleteAll": "Obriši sve razgovore"
+  },
+  "chatItem": {
+    "untitledChat": "Razgovor bez naslova",
+    "renameThisChat": "preimenovati ovaj razgovor",
+    "deleteThisChat": "obrisati ovaj razgovor"
+  },
+  "rowActions": {
+    "rename": "Preimenuj",
+    "editCmNo": "Uredi CM br.",
+    "download": "Preuzmi",
+    "showAllVersions": "Prikaži sve verzije",
+    "uploadNewVersion": "Učitaj novu verziju",
+    "removeFromSubfolder": "Ukloni iz podmape",
+    "unhide": "Prikaži",
+    "hide": "Sakrij"
+  },
+  "people": {
+    "addByEmail": "Dodaj putem e-pošte…",
+    "addMember": "Dodaj člana",
+    "alreadyHasAccess": "{email} već ima pristup.",
+    "isTheOwner": "{email} je vlasnik.",
+    "enterValidEmail": "Unesite valjanu adresu e-pošte.",
+    "peopleWithAccess": "Osobe s pristupom",
+    "noOneHasAccess": "Još nitko nema pristup.",
+    "you": "Vi",
+    "owner": "Vlasnik",
+    "remove": "Ukloni",
+    "removeAccess": "Ukloni pristup",
+    "couldntAdd": "Nije moguće dodati člana. Pokušajte ponovo.",
+    "couldntRemove": "Nije moguće ukloniti člana. Pokušajte ponovo.",
+    "personCount": "{count} {count, plural, one {osoba} few {osobe} other {osoba}} s pristupom."
+  },
+  "shareChat": {
+    "title": "Podijeli razgovor",
+    "shareLink": "Poveznica za dijeljenje",
+    "copied": "Kopirano!",
+    "copyLink": "Kopiraj poveznicu"
+  },
+  "documents": {
+    "searchPlaceholder": "Pretraži…",
+    "noMatches": "Nema pronađenih rezultata",
+    "noDocuments": "Još nema dokumenata",
+    "uploading": "Učitavanje…",
+    "upload": "Učitaj",
+    "selected": "{count} odabrano",
+    "confirm": "Potvrdi",
+    "ownerOnlyDelete": "obrisati ove dokumente — samo autor dokumenta može obrisati dokument",
+    "ownerOnlyDeletePartial": "obrisati {count} od odabranih dokumenata — samo autor dokumenta može obrisati dokument"
+  },
+  "uploadVersion": {
+    "title": "Učitaj novu verziju",
+    "newVersionName": "Naziv nove verzije",
+    "versionNamePlaceholder": "Naziv verzije",
+    "currentVersion": "Trenutna verzija:",
+    "newVersionFile": "Datoteka nove verzije:",
+    "changeFile": "Promijeni datoteku",
+    "upload": "Učitaj"
+  },
+  "confirmDialog": {
+    "confirm": "Potvrdi",
+    "ok": "U redu",
+    "notice": "Obavijest"
+  },
+  "newWorkflow": {
+    "breadcrumbRoot": "Radni tijekovi",
+    "newWorkflow": "Novi radni tijek",
+    "editWorkflow": "Uredi radni tijek",
+    "workflowNamePlaceholder": "Naziv radnog tijeka",
+    "typeLabel": "Vrsta",
+    "assistant": "Asistent",
+    "tabular": "Tablični",
+    "practiceArea": "Pravno područje",
+    "enterPracticeArea": "Unesite pravno područje…",
+    "failedCreate": "Izrada radnog tijeka nije uspjela",
+    "failedUpdate": "Ažuriranje radnog tijeka nije uspjelo",
+    "creating": "Izrada…",
+    "saving": "Spremanje…",
+    "createWorkflow": "Izradi radni tijek",
+    "saveChanges": "Spremi promjene"
+  },
+  "shareWorkflow": {
+    "breadcrumbRoot": "Radni tijekovi",
+    "people": "Osobe",
+    "addPeopleByEmail": "Dodaj osobe putem e-pošte…",
+    "allowEditing": "Dopusti uređivanje primateljima",
+    "peopleWithAccess": "Osobe s pristupom",
+    "none": "Nitko",
+    "canEdit": "Može uređivati",
+    "readOnly": "Samo čitanje",
+    "sharing": "Dijeljenje…",
+    "share": "Podijeli"
+  },
+  "displayWorkflow": {
+    "breadcrumbRoot": "Radni tijekovi",
+    "selectWorkflow": "Odaberi radni tijek",
+    "newChat": "Novi razgovor",
+    "newReview": "Novi pregled",
+    "searchPlaceholder": "Pretraži…",
+    "workflowPrompt": "Prompt radnog tijeka",
+    "noPromptDefined": "_Prompt nije definiran._",
+    "columns": "Stupci",
+    "noColumnsDefined": "Nema definiranih stupaca",
+    "tags": "Oznake",
+    "prompt": "Prompt",
+    "viewPage": "Prikaži stranicu",
+    "edit": "Uredi",
+    "use": "Koristi",
+    "messageOptional": "Poruka (neobvezno)",
+    "additionalInstructions": "Dodajte dodatne upute promptu radnog tijeka…",
+    "createInProject": "Izradi u predmetu",
+    "selectProject": "Odaberi predmet",
+    "selectProjectPlaceholder": "Odaberite predmet…",
+    "noProjectsFound": "Nema pronađenih predmeta",
+    "selectDocuments": "Odaberi dokumente",
+    "noMatchesFound": "Nema pronađenih rezultata",
+    "noDocumentsYet": "Još nema dokumenata",
+    "noDocumentsInProject": "Nema dokumenata u ovom predmetu",
+    "selected": "{count} odabrano",
+    "starting": "Pokretanje…",
+    "startChat": "Započni razgovor",
+    "creating": "Izrada…",
+    "createReview": "Izradi pregled"
+  },
+  "addColumn": {
+    "tabularReview": "Tablični pregled",
+    "newColumn": "Novi stupac",
+    "editColumn": "Uredi stupac",
+    "columnName": "Naziv stupca",
+    "columnPresets": "Predlošci stupaca",
+    "noPreset": "Bez predloška",
+    "format": "Format",
+    "tags": "Oznake",
+    "addTag": "Dodaj oznaku…",
+    "pressEnterToAddTag": "Pritisnite Enter ili zarez za dodavanje oznake.",
+    "prompt": "Prompt",
+    "autoGeneratePrompt": "Automatski generiraj prompt",
+    "promptPlaceholder": "Napišite prompt za analizu — opišite što Mike treba izdvojiti iz svakog dokumenta za ovaj stupac…",
+    "addAnotherColumn": "Dodaj još jedan stupac",
+    "delete": "Obriši",
+    "cancel": "Odustani",
+    "saveChanges": "Spremi promjene",
+    "addColumns": "Dodaj stupce"
+  },
+  "addNewTR": {
+    "projects": "Predmeti",
+    "tabularReviews": "Tablični pregledi",
+    "newReview": "Novi pregled",
+    "reviewName": "Naziv pregleda",
+    "workflowTemplate": "Predložak radnog tijeka",
+    "loadingTemplates": "Učitavanje predložaka…",
+    "noTemplate": "Bez predloška — počni ispočetka",
+    "createUnderProject": "Izradi unutar predmeta",
+    "selectProject": "Odaberite predmet…",
+    "noProjectsFound": "Nema pronađenih predmeta",
+    "selectDocuments": "Odaberi dokumente",
+    "projectDocuments": "Dokumenti predmeta",
+    "documents": "Dokumenti",
+    "noReadyDocuments": "Nema obrađenih dokumenata u ovom predmetu",
+    "noDocumentsYet": "Još nema dokumenata",
+    "uploading": "Učitavanje…",
+    "upload": "Učitaj",
+    "cancel": "Odustani",
+    "create": "Izradi"
+  },
+  "mcpToggle": {
+    "loadingConnectors": "Učitavanje konektora",
+    "connectorStatus": "{enabled} od {total} konektora omogućeno",
+    "connectors": "Konektori",
+    "manageConnectors": "Upravljaj konektorima",
+    "untitled": "Bez naziva"
+  },
+  "projectPage": {
+    "untitledChat": "Razgovor bez naslova",
+    "untitledReview": "Pregled bez naslova",
+    "assistant": "Asistent",
+    "tabularReviews": "Tablični pregledi",
+    "tabularReview": "Tablični pregled",
+    "projects": "Predmeti",
+    "documents": "Dokumenti",
+    "renameReview": "preimenovati ovaj tablični pregled",
+    "deleteReview": "obrisati ovaj tablični pregled"
+  },
+  "tabularReview": {
+    "untitledReview": "Pregled bez naslova",
+    "tabularReviews": "Tablični pregledi",
+    "tabularReview": "Tablični pregled",
+    "assistantInReview": "Asistent za tablični pregled",
+    "searchDocuments": "Pretraži dokumente…",
+    "peopleWithAccess": "Osobe s pristupom",
+    "exportToExcel": "Izvezi u Excel",
+    "export": "Izvezi",
+    "running": "Pokrenuto…",
+    "run": "Pokreni",
+    "actions": "Radnje",
+    "clearResults": "Očisti rezultate",
+    "delete": "Obriši",
+    "addDocuments": "Dodaj dokumente",
+    "addColumns": "Dodaj stupce",
+    "people": "Osobe",
+    "projects": "Predmeti"
+  },
+  "tabularReviewsPage": {
+    "title": "Tablični pregledi",
+    "searchPlaceholder": "Pretraži preglede…",
+    "tabs": {
+      "all": "Svi pregledi",
+      "inProject": "U predmetu",
+      "standalone": "Samostalni"
+    },
+    "filterByProject": "Filtriraj po predmetu",
+    "allProjects": "Svi predmeti",
+    "columns": {
+      "name": "Naziv",
+      "columns": "Stupci",
+      "documents": "Dokumenti",
+      "project": "Predmet",
+      "created": "Datum izrade"
+    },
+    "empty": {
+      "title": "Tablični pregledi",
+      "description": "Izdvojite podatke iz dokumenata u tablice pomoću umjetne inteligencije.",
+      "createNew": "+ Novi pregled",
+      "noReviews": "Nema pronađenih pregleda"
+    },
+    "ownerOnlyRename": "preimenovati ovaj tablični pregled",
+    "ownerOnlyDelete": "obrisati ovaj tablični pregled",
+    "ownerOnlyDeletePartial": "obrisati {count} od odabranih pregleda — samo autor pregleda može obrisati pregled"
+  },
+  "workflowsPage": {
+    "title": "Radni tijekovi",
+    "searchPlaceholder": "Pretraži radne tijekove…",
+    "tabs": {
+      "all": "Svi radni tijekovi",
+      "builtin": "Ugrađeni",
+      "custom": "Prilagođeni",
+      "hidden": "Skriveni"
+    },
+    "filterByType": "Filtriraj po vrsti",
+    "allTypes": "Sve vrste",
+    "filterByPractice": "Filtriraj po području",
+    "allPractices": "Sva područja",
+    "typeAssistant": "Asistent",
+    "typeTabular": "Tablični",
+    "columns": {
+      "name": "Naziv",
+      "type": "Vrsta",
+      "practice": "Područje",
+      "source": "Izvor"
+    },
+    "empty": {
+      "customTitle": "Prilagođeni radni tijekovi",
+      "customDesc": "Izradite višekratne promptove i predloške za tablične preglede prilagođene vašem radu.",
+      "createNew": "+ Novi radni tijek",
+      "hiddenTitle": "Skriveni radni tijekovi",
+      "hiddenDesc": "Ovdje će se prikazivati ugrađeni radni tijekovi koje ste sakrili. Možete ih ponovno prikazati u bilo kojem trenutku.",
+      "allTitle": "Radni tijekovi",
+      "allDesc": "Automatizirajte analizu dokumenata pomoću višekratnih promptova i predložaka za tablične preglede."
+    },
+    "source": {
+      "mike": "Maks",
+      "myself": "Ja",
+      "shared": "Podijeljeno",
+      "sharedBy": "{name}"
+    }
+  }
+}

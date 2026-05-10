@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, Plug, Plus } from "lucide-react";
+import { useTranslations } from "next-intl";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -22,6 +23,7 @@ import {
  * start of the next request.
  */
 export function McpToggleButton() {
+    const t = useTranslations("mcpToggle");
     const [servers, setServers] = useState<McpServer[] | null>(null);
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState<Record<string, boolean>>({});
@@ -77,8 +79,8 @@ export function McpToggleButton() {
                     aria-label="Manage connectors for this chat"
                     title={
                         servers === null
-                            ? "Loading connectors"
-                            : `${enabledCount} of ${totalCount} connectors enabled`
+                            ? t("loadingConnectors")
+                            : t("connectorStatus", { enabled: enabledCount, total: totalCount })
                     }
                     className={`flex items-center gap-1.5 rounded-lg px-2 h-8 text-sm transition-colors ${
                         enabledCount > 0
@@ -88,7 +90,7 @@ export function McpToggleButton() {
                 >
                     <Plug className="h-3.5 w-3.5" />
                     <span className="hidden sm:inline">
-                        Connectors
+                        {t("connectors")}
                         {enabledCount > 0 && totalCount > 0 && (
                             <span className="ml-1 text-xs text-blue-600 font-medium">
                                 {enabledCount}
@@ -99,7 +101,7 @@ export function McpToggleButton() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-72 p-1">
                 <DropdownMenuLabel className="text-xs text-gray-500 font-normal">
-                    Connectors
+                    {t("connectors")}
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {servers?.map((s) => (
@@ -108,6 +110,7 @@ export function McpToggleButton() {
                         server={s}
                         busy={busy[s.id] === true}
                         onToggle={() => handleToggle(s)}
+                        t={t}
                     />
                 ))}
                 <DropdownMenuSeparator />
@@ -116,7 +119,7 @@ export function McpToggleButton() {
                     className="flex items-center gap-2 px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-50 rounded-sm"
                 >
                     <Plus className="h-3.5 w-3.5" />
-                    Manage connectors
+                    {t("manageConnectors")}
                 </a>
             </DropdownMenuContent>
         </DropdownMenu>
@@ -127,13 +130,15 @@ function McpRow({
     server,
     busy,
     onToggle,
+    t,
 }: {
     server: McpServer;
     busy: boolean;
     onToggle: () => void;
+    t: (key: string) => string;
 }) {
     const safeName =
-        server.name.trim().length > 0 ? server.name.trim() : "Untitled";
+        server.name.trim().length > 0 ? server.name.trim() : t("untitled");
     return (
         <button
             type="button"

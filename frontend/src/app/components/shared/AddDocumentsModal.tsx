@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Upload, Search, Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import {
     uploadStandaloneDocument,
     uploadProjectDocument,
@@ -36,6 +37,8 @@ export function AddDocumentsModal({
 }: Props) {
     const { loading, standaloneDocuments, projects } = useDirectoryData(open);
     const { user } = useAuth();
+    const t = useTranslations("documents");
+    const tc = useTranslations("common");
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [uploading, setUploading] = useState(false);
     const [search, setSearch] = useState("");
@@ -224,7 +227,7 @@ export function AddDocumentsModal({
                         <Search className="h-3.5 w-3.5 text-gray-400 shrink-0" />
                         <input
                             type="text"
-                            placeholder="Search…"
+                            placeholder={t("searchPlaceholder")}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             className="flex-1 bg-transparent text-sm text-gray-700 placeholder:text-gray-400 outline-none"
@@ -252,7 +255,7 @@ export function AddDocumentsModal({
                         allowMultiple={allowMultiple}
                         forceExpanded={!!q}
                         emptyMessage={
-                            q ? "No matches found" : "No documents yet"
+                            q ? t("noMatches") : t("noDocuments")
                         }
                         onDelete={handleDelete}
                     />
@@ -279,27 +282,27 @@ export function AddDocumentsModal({
                             ) : (
                                 <Upload className="h-3.5 w-3.5" />
                             )}
-                            {uploading ? "Uploading…" : "Upload"}
+                            {uploading ? t("uploading") : t("upload")}
                         </button>
                     </div>
                     <div className="flex items-center gap-2">
                         {selectedIds.size > 0 && (
                             <span className="text-xs text-gray-400">
-                                {selectedIds.size} selected
+                                {t("selected", { count: selectedIds.size })}
                             </span>
                         )}
                         <button
                             onClick={onClose}
                             className="rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100"
                         >
-                            Cancel
+                            {tc("cancel")}
                         </button>
                         <button
                             onClick={handleConfirm}
                             disabled={selectedIds.size === 0 || uploading}
                             className="rounded-lg bg-gray-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-40"
                         >
-                            {uploading ? "Saving…" : "Confirm"}
+                            {uploading ? tc("saving") : t("confirm")}
                         </button>
                     </div>
                 </div>

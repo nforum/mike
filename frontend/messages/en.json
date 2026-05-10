@@ -1,0 +1,547 @@
+{
+  "common": {
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "cancel": "Cancel",
+    "close": "Close",
+    "delete": "Delete",
+    "actions": "Actions",
+    "loading": "Loading",
+    "error": "Error",
+    "enable": "Enable",
+    "disable": "Disable",
+    "test": "Test",
+    "search": "Search",
+    "name": "Name",
+    "email": "Email",
+    "rename": "Rename"
+  },
+  "sidebar": {
+    "assistant": "Assistant",
+    "projects": "Projects",
+    "tabularReview": "Tabular Review",
+    "workflows": "Workflows",
+    "account": "Account",
+    "accountSettings": "Account Settings",
+    "signOut": "Sign Out",
+    "signIn": "Sign In",
+    "assistantHistory": "Assistant History",
+    "noChatsYet": "No chats yet",
+    "closeSidebar": "Close sidebar",
+    "openSidebar": "Open sidebar"
+  },
+  "login": {
+    "title": "Log In",
+    "logIn": "Log in",
+    "signUp": "Sign up",
+    "signInWithEulex": "Sign in with EULEX",
+    "redirecting": "Redirecting...",
+    "orContinueWith": "or continue with",
+    "google": "Google",
+    "linkedIn": "LinkedIn",
+    "noAccount": "Sign in with your EULEX account. Don't have one?",
+    "createAccount": "Create account"
+  },
+  "signup": {
+    "title": "Create Account",
+    "logIn": "Log in",
+    "signUp": "Sign up",
+    "managedByEulex": "Account registration is managed through EULEX",
+    "createOnEulex": "Create your free account on eulex.ai, then come back here to sign in.",
+    "createAccountOnEulex": "Create Account on EULEX",
+    "alreadyHaveAccount": "Already have an account?",
+    "signIn": "Sign in"
+  },
+  "account": {
+    "settings": "Settings",
+    "tabs": {
+      "general": "General",
+      "models": "Models & API Keys",
+      "connectors": "Connectors"
+    },
+    "profile": {
+      "title": "Profile",
+      "displayName": "Display Name",
+      "displayNamePlaceholder": "Enter your name",
+      "organisation": "Organisation",
+      "organisationPlaceholder": "Enter your organisation",
+      "email": "Email"
+    },
+    "plan": {
+      "title": "Usage Plan",
+      "free": "Free"
+    },
+    "actions": {
+      "title": "Actions",
+      "signOut": "Sign Out"
+    },
+    "danger": {
+      "title": "Danger Zone",
+      "description": "Permanently delete your account and all associated data. This action cannot be undone.",
+      "confirmMessage": "Are you sure? This will permanently delete your account.",
+      "deleteAccount": "Delete Account",
+      "deleting": "Deleting…"
+    },
+    "alerts": {
+      "failedDeleteAccount": "Failed to delete account. Please try again.",
+      "failedUpdateName": "Failed to update display name. Please try again.",
+      "failedUpdateOrg": "Failed to update organisation. Please try again."
+    }
+  },
+  "models": {
+    "title": "Model Preferences",
+    "tabularModel": "Tabular review model",
+    "localLlmNote": "LocalLLM models are configured by the server administrator and are available to all users.",
+    "selectModel": "Select a model",
+    "apiKeys": {
+      "title": "API Keys",
+      "description": "You must provide your own API keys for the app to work or add your API keys into the .env file if you are running your own instance of Mike.",
+      "titleGenNote": "Title generation automatically routes to the cheapest model of whichever provider you've configured (LocalLLM Lite if available, otherwise Gemini Flash Lite, otherwise Claude Haiku).",
+      "anthropic": "Anthropic (Claude) API Key",
+      "google": "Google (Gemini) API Key",
+      "openai": "OpenAI API Key",
+      "mistral": "Mistral AI API Key",
+      "addKeyTooltip": "Add a {provider} API key to use this model",
+      "failedSave": "Failed to save {label}."
+    }
+  },
+  "connectors": {
+    "title": "Connectors",
+    "hideForm": "Hide form",
+    "addConnector": "Add connector",
+    "description": "Connectors plug external tools into Mike via the Model Context Protocol (MCP) — legal-data sources, web research, internal company APIs, and so on. Tools discovered from each connector become available to the chat assistant.",
+    "trustWarning": {
+      "title": "Only add connectors you trust",
+      "description": "A connector's operator can see anything Mike sends in tool calls — your prompts, document excerpts, and the tool's own response. Custom headers (including Authorization tokens) are sent on every request."
+    },
+    "loadingServers": "Loading servers…",
+    "noConnectors": "No connectors configured yet.",
+    "addForm": {
+      "name": "Name",
+      "namePlaceholder": "My connector",
+      "url": "URL",
+      "urlPlaceholder": "https://example.com/mcp",
+      "authentication": "Authentication",
+      "apiKeyHeaders": "API key / headers",
+      "apiKeyHeadersDesc": "For servers that accept a static token. You paste it as a custom header below.",
+      "oauthDiscover": "OAuth (auto-discover)",
+      "oauthDiscoverDesc": "For spec-conformant servers. You'll sign in via a popup — no token to paste.",
+      "customHeaders": "Custom headers (optional)",
+      "customHeadersHint": "Sent on every request. Common usage: Authorization → Bearer <token>.",
+      "headerName": "Header name",
+      "headerValue": "Value",
+      "addHeader": "Add header",
+      "saveAndSignIn": "Save & sign in",
+      "saveConnector": "Save connector",
+      "nameUrlRequired": "Name and URL are required.",
+      "removeHeader": "Remove header"
+    },
+    "card": {
+      "oauthSignedIn": "OAuth · signed in",
+      "oauthRequired": "OAuth · sign-in required",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "signIn": "Sign in",
+      "headers": "Headers:",
+      "untitledConnector": "Untitled connector",
+      "nameContainedSecret": "Name contained what looks like a secret — displayed redacted. Edit the server to fix.",
+      "unknownError": "Unknown error",
+      "discoveredTools": "Discovered {count} tool{count, plural, one {} other {s}}",
+      "hide": "Hide",
+      "show": "Show",
+      "deleteServer": "Delete server"
+    },
+    "confirm": {
+      "removeTitle": "Remove connector",
+      "removeMessage": "Are you sure you want to remove \"{name}\"? This also deletes any saved sign-in tokens.",
+      "removeConfirm": "Remove",
+      "resetOauthTitle": "Reset OAuth and sign in again",
+      "resetOauthMessage": "This wipes saved tokens and re-registers Mike with \"{name}\" from scratch. Use when the connector is stuck on \"Client Not Registered\" or refuses to refresh. You'll be asked to sign in again.",
+      "resetOauthConfirm": "Reset and sign in",
+      "resetOauth": "Reset OAuth",
+      "resetOauthTryAgain": "Reset OAuth and try again"
+    },
+    "alerts": {
+      "signInUnavailable": "Sign-in unavailable",
+      "noAuthorizeUrl": "Authorization server did not return a URL.",
+      "popupBlocked": "Popup blocked",
+      "popupBlockedMessage": "Couldn't open the sign-in window — check your popup blocker and try again.",
+      "signInFailed": "Sign-in failed",
+      "updateFailed": "Update failed",
+      "deleteFailed": "Delete failed",
+      "resetFailed": "Reset failed",
+      "failedToUpdate": "Failed to update",
+      "failedToDelete": "Failed to delete",
+      "failedToResetOauth": "Failed to reset OAuth"
+    }
+  },
+  "assistant": {
+    "greeting": "Hi, {username}",
+    "disclaimer": "AI can make mistakes. Answers are not legal advice.",
+    "placeholder": "Ask a question about your documents...",
+    "projects": "Projects",
+    "workflows": "Workflows",
+    "addDocuments": "Add Documents",
+    "openProjects": "Open projects",
+    "openWorkflows": "Open workflows"
+  },
+  "projects": {
+    "title": "Projects",
+    "searchPlaceholder": "Search projects…",
+    "tabs": {
+      "all": "All",
+      "mine": "Mine",
+      "sharedWithMe": "Shared with me"
+    },
+    "columns": {
+      "name": "Name",
+      "cm": "CM",
+      "files": "Files",
+      "chats": "Chats",
+      "tabularReviews": "Tabular Reviews",
+      "created": "Created"
+    },
+    "empty": {
+      "title": "Projects",
+      "description": "Upload documents into projects and to commence chats and tabular reviews with them.",
+      "createNew": "+ Create New",
+      "noProjects": "No {tab} projects"
+    },
+    "cmPlaceholder": "CM #",
+    "ownerOnlyDeleteWarning": "delete {count} of the selected projects — only the project owner can delete a project"
+  },
+  "modals": {
+    "creditsExhausted": {
+      "title": "Message Limit Reached",
+      "message": "You've reached your monthly message limit of 100 messages.",
+      "resetLabel": "Your credits will reset on:",
+      "resetNote": "Your message credits automatically reset on the first day of each month."
+    },
+    "apiKeyRequired": {
+      "title": "API key required",
+      "message": "You haven't added a {provider} API key yet. Add one in your account settings to use this model.",
+      "goToSettings": "Go to account settings"
+    }
+  },
+  "practices": {
+    "generalTransactions": "General Transactions",
+    "corporate": "Corporate",
+    "finance": "Finance",
+    "litigation": "Litigation",
+    "realEstate": "Real Estate",
+    "tax": "Tax",
+    "employment": "Employment",
+    "ip": "IP",
+    "competition": "Competition",
+    "techTransactions": "Tech Transactions",
+    "projectFinance": "Project Finance",
+    "ecVc": "EC/VC",
+    "privateEquity": "Private Equity",
+    "privateCredit": "Private Credit",
+    "ecm": "ECM",
+    "dcm": "DCM",
+    "levFin": "Lev Fin",
+    "arbitration": "Arbitration",
+    "others": "Others"
+  },
+  "columnPresets": {
+    "parties": "Parties",
+    "governingLaw": "Governing Law",
+    "effectiveDate": "Effective Date",
+    "term": "Term",
+    "termination": "Termination",
+    "changeOfControl": "Change of Control",
+    "confidentiality": "Confidentiality",
+    "assignment": "Assignment",
+    "paymentFees": "Payment & Fees",
+    "amendment": "Amendment",
+    "indemnity": "Indemnity",
+    "warranties": "Warranties",
+    "forceMajeure": "Force Majeure"
+  },
+  "language": {
+    "label": "Language",
+    "en": "English",
+    "hr": "Hrvatski"
+  },
+  "ownerOnly": {
+    "defaultTitle": "Owner-only action",
+    "defaultMessage": "Only the project owner can perform this action.",
+    "actionMessage": "Only the project owner can {action}.",
+    "askAccess": "Ask {email} if you need access.",
+    "ok": "OK"
+  },
+  "deleteChats": {
+    "title": "Delete All Chats",
+    "successTitle": "All Chats Deleted",
+    "successMessage": "Your chat history has been successfully deleted.",
+    "confirmMessage": "Are you sure you want to delete all {count} {count, plural, one {chat} other {chats}}? This action is permanent and cannot be undone.",
+    "deleting": "Deleting...",
+    "deleteAll": "Delete All Chats"
+  },
+  "chatItem": {
+    "untitledChat": "Untitled chat",
+    "renameThisChat": "rename this chat",
+    "deleteThisChat": "delete this chat"
+  },
+  "rowActions": {
+    "rename": "Rename",
+    "editCmNo": "Edit CM No.",
+    "download": "Download",
+    "showAllVersions": "Show all versions",
+    "uploadNewVersion": "Upload new version",
+    "removeFromSubfolder": "Remove from subfolder",
+    "unhide": "Unhide",
+    "hide": "Hide"
+  },
+  "people": {
+    "addByEmail": "Add by email…",
+    "addMember": "Add member",
+    "alreadyHasAccess": "{email} already has access.",
+    "isTheOwner": "{email} is the owner.",
+    "enterValidEmail": "Enter a valid email.",
+    "peopleWithAccess": "People with Access",
+    "noOneHasAccess": "No one has access yet.",
+    "you": "You",
+    "owner": "Owner",
+    "remove": "Remove",
+    "removeAccess": "Remove access",
+    "couldntAdd": "Couldn't add the member. Try again.",
+    "couldntRemove": "Couldn't remove the member. Try again.",
+    "personCount": "{count} {count, plural, one {person} other {people}} with access."
+  },
+  "shareChat": {
+    "title": "Share Chat",
+    "shareLink": "Share Link",
+    "copied": "Copied!",
+    "copyLink": "Copy Link"
+  },
+  "documents": {
+    "searchPlaceholder": "Search…",
+    "noMatches": "No matches found",
+    "noDocuments": "No documents yet",
+    "uploading": "Uploading…",
+    "upload": "Upload",
+    "selected": "{count} selected",
+    "confirm": "Confirm",
+    "ownerOnlyDelete": "delete these documents — only the document creator can delete a document",
+    "ownerOnlyDeletePartial": "delete {count} of the selected documents — only the document creator can delete a document"
+  },
+  "uploadVersion": {
+    "title": "Upload new version",
+    "newVersionName": "New version name",
+    "versionNamePlaceholder": "Version name",
+    "currentVersion": "Current Version:",
+    "newVersionFile": "New Version File:",
+    "changeFile": "Change file",
+    "upload": "Upload"
+  },
+  "confirmDialog": {
+    "confirm": "Confirm",
+    "ok": "OK",
+    "notice": "Notice"
+  },
+  "newWorkflow": {
+    "breadcrumbRoot": "Workflows",
+    "newWorkflow": "New workflow",
+    "editWorkflow": "Edit workflow",
+    "workflowNamePlaceholder": "Workflow name",
+    "typeLabel": "Type",
+    "assistant": "Assistant",
+    "tabular": "Tabular",
+    "practiceArea": "Practice Area",
+    "enterPracticeArea": "Enter practice area…",
+    "failedCreate": "Failed to create workflow",
+    "failedUpdate": "Failed to update workflow",
+    "creating": "Creating…",
+    "saving": "Saving…",
+    "createWorkflow": "Create workflow",
+    "saveChanges": "Save changes"
+  },
+  "shareWorkflow": {
+    "breadcrumbRoot": "Workflows",
+    "people": "People",
+    "addPeopleByEmail": "Add people by email…",
+    "allowEditing": "Allow editing by share recipients",
+    "peopleWithAccess": "People with access",
+    "none": "None",
+    "canEdit": "Can edit",
+    "readOnly": "Read-only",
+    "sharing": "Sharing…",
+    "share": "Share"
+  },
+  "displayWorkflow": {
+    "breadcrumbRoot": "Workflows",
+    "selectWorkflow": "Select workflow",
+    "newChat": "New Chat",
+    "newReview": "New Review",
+    "searchPlaceholder": "Search…",
+    "workflowPrompt": "Workflow Prompt",
+    "noPromptDefined": "_No prompt defined._",
+    "columns": "Columns",
+    "noColumnsDefined": "No columns defined",
+    "tags": "Tags",
+    "prompt": "Prompt",
+    "viewPage": "View Page",
+    "edit": "Edit",
+    "use": "Use",
+    "messageOptional": "Message (optional)",
+    "additionalInstructions": "Add any additional instructions to the workflow prompt…",
+    "createInProject": "Create in a project",
+    "selectProject": "Select project",
+    "selectProjectPlaceholder": "Select a project…",
+    "noProjectsFound": "No projects found",
+    "selectDocuments": "Select documents",
+    "noMatchesFound": "No matches found",
+    "noDocumentsYet": "No documents yet",
+    "noDocumentsInProject": "No documents in this project",
+    "selected": "{count} selected",
+    "starting": "Starting…",
+    "startChat": "Start Chat",
+    "creating": "Creating…",
+    "createReview": "Create Review"
+  },
+  "addColumn": {
+    "tabularReview": "Tabular Review",
+    "newColumn": "New column",
+    "editColumn": "Edit column",
+    "columnName": "Column name",
+    "columnPresets": "Column presets",
+    "noPreset": "No Preset",
+    "format": "Format",
+    "tags": "Tags",
+    "addTag": "Add tag…",
+    "pressEnterToAddTag": "Press Enter or comma to add a tag.",
+    "prompt": "Prompt",
+    "autoGeneratePrompt": "Auto-Generate Prompt",
+    "promptPlaceholder": "Write the analysis prompt — describe what Mike should extract from each document for this column…",
+    "addAnotherColumn": "Add another column",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "saveChanges": "Save changes",
+    "addColumns": "Add columns"
+  },
+  "addNewTR": {
+    "projects": "Projects",
+    "tabularReviews": "Tabular Reviews",
+    "newReview": "New review",
+    "reviewName": "Review name",
+    "workflowTemplate": "Workflow Template",
+    "loadingTemplates": "Loading templates…",
+    "noTemplate": "No template — start from scratch",
+    "createUnderProject": "Create under a project",
+    "selectProject": "Select project…",
+    "noProjectsFound": "No projects found",
+    "selectDocuments": "Select Documents",
+    "projectDocuments": "Project Documents",
+    "documents": "Documents",
+    "noReadyDocuments": "No ready documents in this project",
+    "noDocumentsYet": "No documents yet",
+    "uploading": "Uploading…",
+    "upload": "Upload",
+    "cancel": "Cancel",
+    "create": "Create"
+  },
+  "mcpToggle": {
+    "loadingConnectors": "Loading connectors",
+    "connectorStatus": "{enabled} of {total} connectors enabled",
+    "connectors": "Connectors",
+    "manageConnectors": "Manage connectors",
+    "untitled": "Untitled"
+  },
+  "projectPage": {
+    "untitledChat": "Untitled Chat",
+    "untitledReview": "Untitled Review",
+    "assistant": "Assistant",
+    "tabularReviews": "Tabular Reviews",
+    "tabularReview": "Tabular Review",
+    "projects": "Projects",
+    "documents": "Documents",
+    "renameReview": "rename this tabular review",
+    "deleteReview": "delete this tabular review"
+  },
+  "tabularReview": {
+    "untitledReview": "Untitled Review",
+    "tabularReviews": "Tabular Reviews",
+    "tabularReview": "Tabular Review",
+    "assistantInReview": "Assistant in Tabular Review",
+    "searchDocuments": "Search documents…",
+    "peopleWithAccess": "People with access",
+    "exportToExcel": "Export to Excel",
+    "export": "Export",
+    "running": "Running…",
+    "run": "Run",
+    "actions": "Actions",
+    "clearResults": "Clear results",
+    "delete": "Delete",
+    "addDocuments": "Add Documents",
+    "addColumns": "Add Columns",
+    "people": "People",
+    "projects": "Projects"
+  },
+  "tabularReviewsPage": {
+    "title": "Tabular Reviews",
+    "searchPlaceholder": "Search reviews…",
+    "tabs": {
+      "all": "All Reviews",
+      "inProject": "In Project",
+      "standalone": "Standalone"
+    },
+    "filterByProject": "Filter by project",
+    "allProjects": "All Projects",
+    "columns": {
+      "name": "Name",
+      "columns": "Columns",
+      "documents": "Documents",
+      "project": "Project",
+      "created": "Created"
+    },
+    "empty": {
+      "title": "Tabular Reviews",
+      "description": "Extract data from documents into tables using AI.",
+      "createNew": "+ Create New",
+      "noReviews": "No reviews found"
+    },
+    "ownerOnlyRename": "rename this tabular review",
+    "ownerOnlyDelete": "delete this tabular review",
+    "ownerOnlyDeletePartial": "delete {count} of the selected reviews — only the review creator can delete a review"
+  },
+  "workflowsPage": {
+    "title": "Workflows",
+    "searchPlaceholder": "Search workflows…",
+    "tabs": {
+      "all": "All Workflows",
+      "builtin": "Built-in",
+      "custom": "Custom",
+      "hidden": "Hidden"
+    },
+    "filterByType": "Filter by type",
+    "allTypes": "All Types",
+    "filterByPractice": "Filter by practice",
+    "allPractices": "All Practices",
+    "typeAssistant": "Assistant",
+    "typeTabular": "Tabular",
+    "columns": {
+      "name": "Name",
+      "type": "Type",
+      "practice": "Practice",
+      "source": "Source"
+    },
+    "empty": {
+      "customTitle": "Custom Workflows",
+      "customDesc": "Build reusable prompts and tabular review templates tailored to your practice.",
+      "createNew": "+ Create New",
+      "hiddenTitle": "Hidden Workflows",
+      "hiddenDesc": "Built-in workflows you've hidden will appear here. You can unhide them at any time.",
+      "allTitle": "Workflows",
+      "allDesc": "Automate document analysis with reusable prompts and tabular review templates."
+    },
+    "source": {
+      "mike": "Mike",
+      "myself": "Myself",
+      "shared": "Shared",
+      "sharedBy": "{name}"
+    }
+  }
+}

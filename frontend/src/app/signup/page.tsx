@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { SiteLogo } from "@/components/site-logo";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
@@ -9,6 +10,7 @@ import Link from "next/link";
 export default function SignupPage() {
     const router = useRouter();
     const { isAuthenticated, authLoading } = useAuth();
+    const t = useTranslations("signup");
 
     useEffect(() => {
         if (!authLoading && isAuthenticated) {
@@ -25,17 +27,17 @@ export default function SignupPage() {
                 <div className="bg-white border border-gray-200 rounded-2xl p-8">
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-left text-2xl font-serif">
-                            Create Account
+                            {t("title")}
                         </h2>
                         <div className="bg-gray-100 p-1 rounded-md flex text-xs font-medium">
                             <Link
                                 href="/login"
                                 className="px-3 py-1 text-gray-500 hover:text-gray-900"
                             >
-                                Log in
+                                {t("logIn")}
                             </Link>
                             <span className="px-3 py-1 bg-white rounded-sm shadow-sm text-gray-900">
-                                Sign up
+                                {t("signUp")}
                             </span>
                         </div>
                     </div>
@@ -57,11 +59,10 @@ export default function SignupPage() {
                             </svg>
                         </div>
                         <p className="text-gray-700 mb-2 font-medium">
-                            Account registration is managed through EULEX
+                            {t("managedByEulex")}
                         </p>
                         <p className="text-gray-500 text-sm mb-6">
-                            Create your free account on eulex.ai, then come back
-                            here to sign in.
+                            {t("createOnEulex")}
                         </p>
                         <a
                             href="https://eulex.ai/signup"
@@ -69,7 +70,7 @@ export default function SignupPage() {
                             rel="noopener noreferrer"
                             className="inline-flex items-center justify-center w-full py-3 px-6 rounded-xl bg-black text-white font-medium hover:bg-gray-900 transition-colors"
                         >
-                            Create Account on EULEX
+                            {t("createAccountOnEulex")}
                             <svg
                                 className="w-4 h-4 ml-2"
                                 fill="none"
@@ -88,12 +89,12 @@ export default function SignupPage() {
 
                     <div className="border-t border-gray-100 pt-4 text-center">
                         <p className="text-xs text-gray-400">
-                            Already have an account?{" "}
+                            {t("alreadyHaveAccount")}{" "}
                             <Link
                                 href="/login"
                                 className="text-blue-600 hover:underline"
                             >
-                                Sign in
+                                {t("signIn")}
                             </Link>
                         </p>
                     </div>

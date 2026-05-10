@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AlertCircle, Check, ChevronDown, Eye, EyeOff } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,6 +23,8 @@ import {
 
 export default function ModelsAndApiKeysPage() {
     const { profile, updateModelPreference, updateApiKey } = useUserProfile();
+    const t = useTranslations("models");
+    const tc = useTranslations("common");
 
     return (
         <div className="space-y-4">
@@ -29,13 +32,13 @@ export default function ModelsAndApiKeysPage() {
             <div className="pb-6">
                 <div className="flex items-center gap-2 mb-4">
                     <h2 className="text-2xl font-medium font-serif">
-                        Model Preferences
+                        {t("title")}
                     </h2>
                 </div>
                 <div className="space-y-4 max-w-md">
                     <div>
                         <label className="text-sm text-gray-600 block mb-2">
-                            Tabular review model
+                            {t("tabularModel")}
                         </label>
                         <TabularModelDropdown
                             value={
@@ -53,7 +56,7 @@ export default function ModelsAndApiKeysPage() {
                             }
                         />
                         <p className="text-xs text-gray-500 mt-2">
-                            LocalLLM models are configured by the server administrator and are available to all users.
+                            {t("localLlmNote")}
                         </p>
                     </div>
                 </div>
@@ -63,22 +66,18 @@ export default function ModelsAndApiKeysPage() {
             <div className="py-6">
                 <div className="flex items-center gap-2 mb-2">
                     <h2 className="text-2xl font-medium font-serif">
-                        API Keys
+                        {t("apiKeys.title")}
                     </h2>
                 </div>
                 <p className="text-sm text-gray-500 mb-4 max-w-xl">
-                    You must provide your own API keys for the app to work or
-                    add your API keys into the .env file if you are running your
-                    own instance of Mike.
+                    {t("apiKeys.description")}
                 </p>
                 <p className="text-xs text-gray-400 mb-4 max-w-xl">
-                    Title generation automatically routes to the cheapest model
-                    of whichever provider you&rsquo;ve configured (LocalLLM Lite if
-                    available, otherwise Gemini Flash Lite, otherwise Claude Haiku).
+                    {t("apiKeys.titleGenNote")}
                 </p>
                 <div className="space-y-4 max-w-xl">
                     <ApiKeyField
-                        label="Anthropic (Claude) API Key"
+                        label={t("apiKeys.anthropic")}
                         placeholder="sk-ant-…"
                         initialValue={profile?.claudeApiKey ?? ""}
                         onSave={(value) =>
@@ -86,7 +85,7 @@ export default function ModelsAndApiKeysPage() {
                         }
                     />
                     <ApiKeyField
-                        label="Google (Gemini) API Key"
+                        label={t("apiKeys.google")}
                         placeholder="AI…"
                         initialValue={profile?.geminiApiKey ?? ""}
                         onSave={(value) =>
@@ -94,7 +93,7 @@ export default function ModelsAndApiKeysPage() {
                         }
                     />
                     <ApiKeyField
-                        label="OpenAI API Key"
+                        label={t("apiKeys.openai")}
                         placeholder="sk-…"
                         initialValue={profile?.openaiApiKey ?? ""}
                         onSave={(value) =>
@@ -102,7 +101,7 @@ export default function ModelsAndApiKeysPage() {
                         }
                     />
                     <ApiKeyField
-                        label="Mistral AI API Key"
+                        label={t("apiKeys.mistral")}
                         placeholder="sk-…"
                         initialValue={profile?.mistralApiKey ?? ""}
                         onSave={(value) =>
@@ -124,6 +123,7 @@ function TabularModelDropdown({
     onChange: (id: string) => void;
     apiKeys: { claudeApiKey: string | null; geminiApiKey: string | null; openaiApiKey: string | null; mistralApiKey: string | null };
 }) {
+    const t = useTranslations("models");
     const [isOpen, setIsOpen] = useState(false);
     const selected = MODELS.find((m) => m.id === value);
     const selectedAvailable = isModelAvailable(value, apiKeys);
@@ -141,7 +141,7 @@ function TabularModelDropdown({
                             <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-500" />
                         )}
                         <span className="truncate text-gray-900">
-                            {selected?.label ?? "Select a model"}
+                            {selected?.label ?? t("selectModel")}
                         </span>
                     </span>
                     <ChevronDown
@@ -170,7 +170,7 @@ function TabularModelDropdown({
                                     apiKeys,
                                 );
                                 const tooltip = !available && m.group !== "LocalLLM"
-                                    ? `Add a ${providerLabel(provider)} API key to use this model`
+                                    ? t("apiKeys.addKeyTooltip", { provider: providerLabel(provider) })
                                     : undefined;
                                 return (
                                     <DropdownMenuItem
@@ -212,6 +212,8 @@ function ApiKeyField({
     initialValue: string;
     onSave: (value: string) => Promise<boolean>;
 }) {
+    const t = useTranslations("models");
+    const tc = useTranslations("common");
     const [value, setValue] = useState(initialValue);
     const [reveal, setReveal] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -231,7 +233,7 @@ function ApiKeyField({
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);
         } else {
-            alert(`Failed to save ${label}.`);
+            alert(t("apiKeys.failedSave", { label }));
         }
     };
 
@@ -268,14 +270,14 @@ function ApiKeyField({
                     className="min-w-[80px] transition-all bg-black hover:bg-gray-900 text-white"
                 >
                     {isSaving ? (
-                        "Saving..."
+                        tc("saving")
                     ) : saved ? (
                         <>
                             <Check className="h-4 w-3" />
-                            Saved
+                            {tc("saved")}
                         </>
                     ) : (
-                        "Save"
+                        tc("save")
                     )}
                 </Button>
             </div>

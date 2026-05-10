@@ -17,6 +17,7 @@ import {
     Square,
     X,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { AddDocButton } from "./AddDocButton";
 import { AddDocumentsModal } from "../shared/AddDocumentsModal";
 import { AssistantWorkflowModal } from "./AssistantWorkflowModal";
@@ -60,6 +61,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput(
     }: Props,
     ref,
 ) {
+    const t = useTranslations("assistant");
     const [value, setValue] = useState("");
     const [attachedDocs, setAttachedDocs] = useState<MikeDocument[]>([]);
     const [selectedWorkflow, setSelectedWorkflow] = useState<{
@@ -224,7 +226,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput(
                         <textarea
                             ref={textareaRef}
                             rows={1}
-                            placeholder="Ask a question about your documents..."
+                    placeholder={t("placeholder")}
                             value={value}
                             onChange={handleChange}
                             onKeyDown={handleKeyDown}
@@ -253,7 +255,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput(
                                 >
                                     <FolderOpen className="h-3.5 w-3.5" />
                                     <span className="hidden sm:inline">
-                                        Projects
+                                        {t("projects")}
                                     </span>
                                 </button>
                             )}
@@ -270,7 +272,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput(
                                         <Library className="h-3.5 w-3.5" />
                                     )}
                                     <span className="hidden sm:inline">
-                                        Workflows
+                                        {t("workflows")}
                                     </span>
                                 </button>
                             )}
@@ -308,7 +310,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput(
                 open={docSelectorOpen}
                 onClose={() => setDocSelectorOpen(false)}
                 onSelect={handleAddDocsFromSelector}
-                breadcrumb={["Assistant", "Add Documents"]}
+                breadcrumb={[t("projects"), t("addDocuments")]}
             />
             <AssistantWorkflowModal
                 open={workflowModalOpen}

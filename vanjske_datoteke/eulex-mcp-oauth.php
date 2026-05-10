@@ -217,6 +217,37 @@ add_action('init', function () {
 	// Authorization Endpoint
 	// ---------------------------------------------------------------
 	if ($path === '/eulex-ai/mcp-oauth/authorize' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+		// If we redirected to /signin/ to log the user in, the social-login
+		// round-trip (e.g. Nextend Google plugin) often strips our PKCE +
+		// client_id + state query params from the final redirect_to URL. To
+		// survive that, the pre-login branch below stashes the full $_GET
+		// payload in a transient keyed by a short `mcp_resume` token. On the
+		// way back we restore the params and bounce to a clean URL so the
+		// consent screen's approve/deny links (built from REQUEST_URI) see
+		// the full original query string.
+		if (!empty($_GET['mcp_resume'])) {
+			$resume_token = sanitize_text_field($_GET['mcp_resume']);
+			$stored = get_transient('eulex_mcp_resume_' . $resume_token);
+			if (is_array($stored)) {
+				$rebuilt = $stored;
+				unset($rebuilt['mcp_resume']);
+				// Preserve anything explicitly added by the social-login
+				// callback (e.g. tracking params); originals win over $_GET
+				// only for missing keys.
+				foreach ($_GET as $k => $v) {
+					if ($k === 'mcp_resume') continue;
+					if (!isset($rebuilt[$k])) {
+						$rebuilt[$k] = $v;
+					}
+				}
+				// Transient stays alive for the consent screen round-trip;
+				// it will simply expire (15 min TTL) if the user wanders off.
+				$clean_url = home_url('/eulex-ai/mcp-oauth/authorize?' . http_build_query($rebuilt));
+				wp_redirect($clean_url);
+				exit;
+			}
+		}
+
 		$client_id      = sanitize_text_field($_GET['client_id'] ?? '');
 		$redirect_uri   = esc_url_raw($_GET['redirect_uri'] ?? '');
 		$response_type  = sanitize_text_field($_GET['response_type'] ?? '');
@@ -238,9 +269,19 @@ add_action('init', function () {
 			wp_die('redirect_uri is required.', 'OAuth Error', ['response' => 400]);
 		}
 
-		// If user is not logged in, redirect to EULEX sign-in page
+		// If user is not logged in, redirect to EULEX sign-in page. Stash the
+		// full $_GET in a transient and pass only a short resume token in the
+		// return URL — that way social-login plugins which only forward a
+		// truncated redirect_to can't break the flow.
 		if (!is_user_logged_in()) {
-			$return_url = home_url('/eulex-ai/mcp-oauth/authorize?' . http_build_query($_GET));
+			$resume_token = wp_generate_password(32, false, false);
+			set_transient(
+				'eulex_mcp_resume_' . $resume_token,
+				$_GET,
+				15 * MINUTE_IN_SECONDS
+			);
+
+			$return_url = home_url('/eulex-ai/mcp-oauth/authorize?mcp_resume=' . $resume_token);
 			$signin_url = home_url('/signin/?redirect_to=' . urlencode($return_url));
 			wp_redirect($signin_url);
 			exit;

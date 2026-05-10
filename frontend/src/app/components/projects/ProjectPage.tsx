@@ -63,6 +63,7 @@ import { UploadNewVersionModal } from "@/app/components/shared/UploadNewVersionM
 import { DocViewModal } from "@/app/components/shared/DocViewModal";
 import { AddNewTRModal } from "@/app/components/tabular/AddNewTRModal";
 import { useChatHistoryContext } from "@/app/contexts/ChatHistoryContext";
+import { useTranslations } from "next-intl";
 
 interface Props {
     projectId: string;
@@ -272,6 +273,7 @@ function DocVersionHistory({
 }
 
 export function ProjectPage({ projectId }: Props) {
+    const tProject = useTranslations("projectPage");
     const [project, setProject] = useState<MikeProject | null>(null);
     const [folders, setFolders] = useState<MikeFolder[]>([]);
     const [chats, setChats] = useState<MikeChat[]>([]);
@@ -709,7 +711,7 @@ export function ProjectPage({ projectId }: Props) {
         if (!trimmed) return;
         const review = projectReviews.find((r) => r.id === reviewId);
         if (review && user?.id && review.user_id !== user.id) {
-            setOwnerOnlyAction("rename this tabular review");
+            setOwnerOnlyAction(tProject("renameReview"));
             return;
         }
         setProjectReviews((prev) => prev.map((r) => (r.id === reviewId ? { ...r, title: trimmed } : r)));
@@ -1248,7 +1250,7 @@ export function ProjectPage({ projectId }: Props) {
                             onClick={() => router.push("/projects")}
                             className="text-gray-400 hover:text-gray-600 transition-colors"
                         >
-                            Projects
+                            {tProject("projects")}
                         </button>
                         <span className="text-gray-300">›</span>
                         {tab !== "documents" ? (
@@ -1269,7 +1271,7 @@ export function ProjectPage({ projectId }: Props) {
                         {tab !== "documents" && (
                             <>
                                 <span className="text-gray-300">›</span>
-                                <span className="text-gray-900">{tab === "assistant" ? "Assistant" : "Tabular Reviews"}</span>
+                                <span className="text-gray-900">{tab === "assistant" ? tProject("assistant") : tProject("tabularReviews")}</span>
                             </>
                         )}
                     </div>
@@ -1303,7 +1305,7 @@ export function ProjectPage({ projectId }: Props) {
                             }`}
                         >
                             {creatingReview ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                            Tabular Review
+                            {tProject("tabularReview")}
                         </button>
                         {docs.length === 0 && (
                             <div className="pointer-events-none absolute right-0 top-full mt-1.5 z-10 hidden group-hover:flex items-center whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs text-white shadow-lg">
@@ -1316,9 +1318,9 @@ export function ProjectPage({ projectId }: Props) {
 
             <ToolbarTabs
                 tabs={[
-                    { id: "documents", label: "Documents" },
-                    { id: "assistant", label: "Assistant" },
-                    { id: "reviews", label: "Tabular Reviews" },
+                    { id: "documents", label: tProject("documents") },
+                    { id: "assistant", label: tProject("assistant") },
+                    { id: "reviews", label: tProject("tabularReviews") },
                 ]}
                 active={tab}
                 onChange={handleTabChange}
@@ -1598,7 +1600,7 @@ export function ProjectPage({ projectId }: Props) {
                                             {renamingChatId === chat.id ? (
                                                 <input autoFocus value={renameChatValue} onChange={(e) => setRenameChatValue(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submitChatRename(chat.id); if (e.key === "Escape") setRenamingChatId(null); }} onBlur={() => submitChatRename(chat.id)} onClick={(e) => e.stopPropagation()} className="w-full text-sm text-gray-800 bg-transparent outline-none" />
                                             ) : (
-                                                <span className="text-sm text-gray-800 truncate block">{chat.title ?? "Untitled Chat"}</span>
+                                                <span className="text-sm text-gray-800 truncate block">{chat.title ?? tProject("untitledChat")}</span>
                                             )}
                                         </div>
                                         <div className="ml-auto w-32 shrink-0 text-sm text-gray-500 truncate">{formatDate(chat.created_at)}</div>
@@ -1609,7 +1611,7 @@ export function ProjectPage({ projectId }: Props) {
                                                         setOwnerOnlyAction("rename this chat");
                                                         return;
                                                     }
-                                                    setRenameChatValue(chat.title ?? "Untitled Chat");
+                                                    setRenameChatValue(chat.title ?? tProject("untitledChat"));
                                                     setRenamingChatId(chat.id);
                                                 }}
                                                 onDelete={async () => {
@@ -1656,7 +1658,7 @@ export function ProjectPage({ projectId }: Props) {
                         {projectReviews.length === 0 ? (
                             <div className="flex flex-col items-start py-24 w-full max-w-xs mx-auto">
                                 <Table2 className="h-8 w-8 text-gray-300 mb-4" />
-                                <p className="text-2xl font-medium font-serif text-gray-900">Tabular Reviews</p>
+                                <p className="text-2xl font-medium font-serif text-gray-900">{tProject("tabularReviews")}</p>
                                 <p className="mt-1 text-xs text-gray-400 max-w-xs">Extract data from project documents into tables using AI.</p>
                                 <button onClick={handleNewReview} disabled={creatingReview || docs.length === 0} className="mt-4 inline-flex items-center gap-1 rounded-full bg-gray-900 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 transition-colors shadow-md disabled:opacity-40">
                                     + Create New
@@ -1677,7 +1679,7 @@ export function ProjectPage({ projectId }: Props) {
                                             {renamingReviewId === review.id ? (
                                                 <input autoFocus value={renameReviewValue} onChange={(e) => setRenameReviewValue(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submitReviewRename(review.id); if (e.key === "Escape") setRenamingReviewId(null); }} onBlur={() => submitReviewRename(review.id)} onClick={(e) => e.stopPropagation()} className="w-full text-sm text-gray-800 bg-transparent outline-none" />
                                             ) : (
-                                                <span className="text-sm text-gray-800 truncate block">{review.title ?? "Untitled Review"}</span>
+                                                <span className="text-sm text-gray-800 truncate block">{review.title ?? tProject("untitledReview")}</span>
                                             )}
                                         </div>
                                         <div className="ml-auto w-24 shrink-0 text-sm text-gray-500 truncate">{review.columns_config?.length ?? 0}</div>
@@ -1687,15 +1689,15 @@ export function ProjectPage({ projectId }: Props) {
                                             <RowActions
                                                 onRename={() => {
                                                     if (user?.id && review.user_id !== user.id) {
-                                                        setOwnerOnlyAction("rename this tabular review");
+                                                        setOwnerOnlyAction(tProject("renameReview"));
                                                         return;
                                                     }
-                                                    setRenameReviewValue(review.title ?? "Untitled Review");
+                                                    setRenameReviewValue(review.title ?? tProject("untitledReview"));
                                                     setRenamingReviewId(review.id);
                                                 }}
                                                 onDelete={async () => {
                                                     if (user?.id && review.user_id !== user.id) {
-                                                        setOwnerOnlyAction("delete this tabular review");
+                                                        setOwnerOnlyAction(tProject("deleteReview"));
                                                         return;
                                                     }
                                                     await deleteTabularReview(review.id);

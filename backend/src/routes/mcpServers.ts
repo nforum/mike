@@ -285,13 +285,23 @@ mcpServersRouter.post("/:id/test", requireAuth, async (req, res) => {
 // completes consent at the connector's auth server and is redirected back to
 // /mcp/oauth/callback (mounted under mcpOauthRouter), which exchanges the
 // code and stores tokens.
+//
+// Stale-DCR recovery: the SDK's auth() helper auto-recovers from
+// `invalid_client` at the *token* endpoint (auth.js:152-154 invalidates and
+// retries). It cannot recover when the auth server rejects a stale client_id
+// at the *authorization* endpoint, because that error never travels back to
+// our backend — the user just sees a "Client Not Registered" HTML page in
+// the popup. To pre-empt that dead-end, we proactively clear cached DCR
+// metadata whenever the user starts a fresh interactive sign-in (no tokens
+// stored), so the SDK does a fresh discovery + DCR every time. Cost is one
+// extra POST to /register; correctness is worth it.
 mcpServersRouter.post("/:id/oauth/start", requireAuth, async (req, res) => {
     const userId = res.locals.userId as string;
     const { id } = req.params;
     const db = createServerSupabase();
     const { data: row, error } = await db
         .from("user_mcp_servers")
-        .select("id, user_id, url, auth_type")
+        .select("id, user_id, url, auth_type, oauth_metadata, oauth_tokens")
         .eq("id", id)
         .eq("user_id", userId)
         .single();
@@ -303,6 +313,26 @@ mcpServersRouter.post("/:id/oauth/start", requireAuth, async (req, res) => {
     }
 
     const provider = new DbOAuthProvider(db, row.id, userId, "initiate");
+
+    const cachedMetadata = row.oauth_metadata as Record<string, unknown> | null;
+    const hasCachedDcr =
+        cachedMetadata !== null &&
+        typeof cachedMetadata === "object" &&
+        Object.keys(cachedMetadata).length > 0;
+    const hasTokens = !!row.oauth_tokens;
+
+    if (hasCachedDcr && !hasTokens) {
+        // Signed-out state with leftover DCR cache — nuke it so the SDK
+        // re-discovers and re-registers with the auth server. This is the
+        // common "Client Not Registered" recovery path: the auth server
+        // forgot us (restart, registry reset, server URL change), but Mike
+        // still has the old client_id sitting in oauth_metadata.
+        console.info(
+            `[mcp-oauth] clearing stale DCR cache for connector ${id} (no tokens, refreshing client registration)`,
+        );
+        await provider.invalidateCredentials("client");
+    }
+
     try {
         const result = await runOAuth(provider, { serverUrl: row.url });
         if (result === "AUTHORIZED") {
@@ -329,4 +359,35 @@ mcpServersRouter.post("/:id/oauth/start", requireAuth, async (req, res) => {
             .eq("id", id);
         res.status(500).json({ detail: message });
     }
+});
+
+// POST /user/mcp-servers/:id/reauth — wipe all OAuth state and start fresh.
+// Used by the UI when the user explicitly wants to reset a stuck connector
+// (e.g. server-side registry was reset, signed in but tokens are bad). The
+// next /oauth/start call will do full discovery + DCR + authorization from
+// scratch. Returns 204 on success.
+mcpServersRouter.post("/:id/reauth", requireAuth, async (req, res) => {
+    const userId = res.locals.userId as string;
+    const { id } = req.params;
+    const db = createServerSupabase();
+    const { data: row, error } = await db
+        .from("user_mcp_servers")
+        .select("id, user_id, auth_type")
+        .eq("id", id)
+        .eq("user_id", userId)
+        .single();
+    if (error || !row) return void res.status(404).json({ detail: "Not found" });
+    if (row.auth_type !== "oauth") {
+        return void res
+            .status(400)
+            .json({ detail: "Connector is not configured for OAuth" });
+    }
+
+    const provider = new DbOAuthProvider(db, row.id, userId, "initiate");
+    await provider.invalidateCredentials("all");
+    await db
+        .from("user_mcp_servers")
+        .update({ last_error: null })
+        .eq("id", id);
+    return void res.status(204).end();
 });

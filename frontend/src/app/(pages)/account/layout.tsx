@@ -2,19 +2,20 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface TabDef {
     id: string;
-    label: string;
+    labelKey: "general" | "models" | "connectors";
     href: string;
 }
 
 const TABS: TabDef[] = [
-    { id: "general", label: "General", href: "/account" },
-    { id: "models", label: "Models & API Keys", href: "/account/models" },
-    { id: "mcp", label: "Connectors", href: "/account/mcp" },
+    { id: "general", labelKey: "general", href: "/account" },
+    { id: "models", labelKey: "models", href: "/account/models" },
+    { id: "mcp", labelKey: "connectors", href: "/account/mcp" },
 ];
 
 export default function AccountLayout({
@@ -25,6 +26,7 @@ export default function AccountLayout({
     const router = useRouter();
     const pathname = usePathname();
     const { isAuthenticated, authLoading } = useAuth();
+    const t = useTranslations("account");
 
     useEffect(() => {
         if (!authLoading && !isAuthenticated) {
@@ -48,7 +50,7 @@ export default function AccountLayout({
         <div className="flex flex-col h-full md:overflow-y-auto px-6 py-6 md:py-10">
             <div className="max-w-5xl w-full mx-auto">
                 <h1 className="text-4xl font-medium mb-8 font-eb-garamond">
-                    Settings
+                    {t("settings")}
                 </h1>
 
                 <div className="flex flex-col md:flex-row gap-6 md:gap-10">
@@ -68,7 +70,7 @@ export default function AccountLayout({
                                             : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
                                     }`}
                                 >
-                                    {tab.label}
+                                    {t(`tabs.${tab.labelKey}`)}
                                 </button>
                             );
                         })}

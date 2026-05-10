@@ -922,6 +922,16 @@ export async function deleteMcpServer(id: string): Promise<void> {
     await apiRequest(`/user/mcp-servers/${id}`, { method: "DELETE" });
 }
 
+/**
+ * Wipes all OAuth state (DCR registration, tokens, code verifier) for a
+ * connector. Use when the auth server has forgotten the client (e.g. after
+ * a server-side registry reset) and the cached client_id is stuck — calling
+ * this and then `startMcpOauth` forces a fresh discovery + DCR + sign-in.
+ */
+export async function resetMcpOauth(id: string): Promise<void> {
+    await apiRequest(`/user/mcp-servers/${id}/reauth`, { method: "POST" });
+}
+
 export async function testMcpServer(id: string): Promise<McpServerTestResult> {
     return apiRequest<McpServerTestResult>(`/user/mcp-servers/${id}/test`, {
         method: "POST",
