@@ -17,6 +17,11 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npx tsc
 
+# tsc only emits .js — copy data assets (e.g. curated source catalogs)
+# from src/ into dist/ at the same relative paths so runtime
+# `fs.readFileSync(__dirname, '<file>.json')` calls still resolve.
+RUN cd src && find . -name '*.json' -exec sh -c 'mkdir -p "../dist/$(dirname "$1")" && cp "$1" "../dist/$1"' _ {} \;
+
 # ── Stage 2: Runtime ────────────────────────────────────────────
 FROM node:22-slim AS runner
 WORKDIR /app

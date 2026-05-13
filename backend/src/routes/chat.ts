@@ -17,8 +17,28 @@ import {
     closeMcpServers,
     loadEnabledMcpServersForUser,
 } from "../lib/mcp/servers";
+import { loadBuiltinMcpServers } from "../lib/mcp/builtin";
 
 export const chatRouter = Router();
+
+/**
+ * Per-chat collaborator check (jsonb email list on chats.shared_with —
+ * see migration 109). Mirrors the projects.shared_with pattern: anyone
+ * whose JWT-derived email is in the array is allowed to read and post
+ * to the chat, but PATCH/DELETE still stay owner-only.
+ */
+function chatHasCollaborator(
+    chat: { shared_with?: unknown } | null | undefined,
+    userEmail: string,
+): boolean {
+    if (!chat || !userEmail) return false;
+    const list = (chat as { shared_with?: unknown }).shared_with;
+    if (!Array.isArray(list)) return false;
+    const target = userEmail.toLowerCase();
+    return (list as unknown[]).some(
+        (e) => typeof e === "string" && e.toLowerCase() === target,
+    );
+}
 
 // GET /chat
 // Visible chats = the user's own chats + every chat under a project the
@@ -82,7 +102,9 @@ chatRouter.get("/:chatId", requireAuth, async (req, res) => {
         .single();
     if (error || !chat)
         return void res.status(404).json({ detail: "Chat not found" });
-    // Owner of the chat OR a member of the chat's project can view it.
+    // Owner of the chat, member of the chat's project, OR a per-chat
+    // collaborator (chats.shared_with — added after accepting a share
+    // invite, see routes/chatShares.ts) can view it.
     let canView = chat.user_id === userId;
     if (!canView && chat.project_id) {
         const access = await checkProjectAccess(
@@ -92,6 +114,9 @@ chatRouter.get("/:chatId", requireAuth, async (req, res) => {
             db,
         );
         canView = access.ok;
+    }
+    if (!canView && userEmail) {
+        canView = chatHasCollaborator(chat, userEmail);
     }
     if (!canView)
         return void res.status(404).json({ detail: "Chat not found" });
@@ -272,7 +297,7 @@ chatRouter.post("/:chatId/generate-title", requireAuth, async (req, res) => {
     const db = createServerSupabase();
     const { data: chat, error } = await db
         .from("chats")
-        .select("id, user_id, project_id")
+        .select("id, user_id, project_id, shared_with")
         .eq("id", chatId)
         .single();
 
@@ -288,17 +313,20 @@ chatRouter.post("/:chatId/generate-title", requireAuth, async (req, res) => {
         );
         canTitle = access.ok;
     }
+    if (!canTitle && userEmail) {
+        canTitle = chatHasCollaborator(chat, userEmail);
+    }
     if (!canTitle)
         return void res.status(404).json({ detail: "Chat not found" });
 
     try {
-        const { title_model, api_keys } = await getUserModelSettings(
-            userId,
-            db,
-        );
+        const { title_model, api_keys, preferred_language } =
+            await getUserModelSettings(userId, db);
+        const langName =
+            preferred_language === "hr" ? "Croatian" : "English";
         const titleText = await completeText({
             model: title_model,
-            user: `Generate a concise title (3–6 words) for a chat in an AI Legal Platform that starts with this message. The title should describe the topic or document — do NOT include words like "Legal Assistant", "AI", "Chat", or any similar prefix. Return only the title, no quotes or punctuation.\n\nMessage: ${message.slice(0, 500)}`,
+            user: `Generate a concise title (3–6 words) for a chat in an AI Legal Platform that starts with this message. The title MUST be written in ${langName} (the user's UI language), regardless of the language of the user's message. The title should describe the topic or document — do NOT include words like "Legal Assistant", "AI", "Chat", or any similar prefix. Return only the title, no quotes or punctuation.\n\nMessage: ${message.slice(0, 500)}`,
             maxTokens: 64,
             apiKeys: api_keys,
         });
@@ -320,11 +348,29 @@ chatRouter.post("/:chatId/generate-title", requireAuth, async (req, res) => {
 // POST /chat — streaming
 chatRouter.post("/", requireAuth, async (req, res) => {
     const userId = res.locals.userId as string;
-    const { messages, chat_id, project_id, model } = req.body as {
+    const {
+        messages,
+        chat_id,
+        project_id,
+        model,
+        client,
+        editMode,
+    } = req.body as {
         messages: ChatMessage[];
         chat_id?: string;
         project_id?: string;
         model?: string;
+        // `client` lets the LLM tailor its tool-use strategy: the Word
+        // add-in needs `find` strings that survive Office.js' search
+        // primitive (≤200 chars, single paragraph). Defaults to "web"
+        // when missing so existing callers (Max frontend, public API)
+        // keep their behavior.
+        client?: "web" | "word";
+        // How the user wants edits applied in the Word client. Plumbed
+        // into the system prompt so the model phrases reasons
+        // accordingly, and echoed in the `doc_edited` event so the
+        // client picks the right Apply UI.
+        editMode?: "track" | "comments";
     };
 
     console.log("[chat/stream] incoming request", {
@@ -332,6 +378,8 @@ chatRouter.post("/", requireAuth, async (req, res) => {
         chat_id,
         project_id,
         model,
+        client: client ?? "web",
+        editMode: editMode ?? "track",
         messageCount: messages?.length,
     });
 
@@ -341,10 +389,11 @@ chatRouter.post("/", requireAuth, async (req, res) => {
     let chatTitle: string | null = null;
 
     if (chatId) {
-        // Either chat owner OR a member of the chat's project can post.
+        // Chat owner, a member of the chat's project, OR a per-chat
+        // collaborator (chats.shared_with) can post into the thread.
         const { data: existing } = await db
             .from("chats")
-            .select("id, title, user_id, project_id")
+            .select("id, title, user_id, project_id, shared_with")
             .eq("id", chatId)
             .single();
         let canUse = !!existing && existing.user_id === userId;
@@ -356,6 +405,9 @@ chatRouter.post("/", requireAuth, async (req, res) => {
                 db,
             );
             canUse = access.ok;
+        }
+        if (!canUse && existing && userEmail) {
+            canUse = chatHasCollaborator(existing, userEmail);
         }
         if (!canUse || !existing) chatId = null;
         else chatTitle = existing.title;
@@ -398,7 +450,11 @@ chatRouter.post("/", requireAuth, async (req, res) => {
         await db.from("chat_messages").insert({
             chat_id: chatId,
             role: "user",
-            content: lastUser.content,
+            // `chat_messages.content` is jsonb (migration 107) — user turns
+            // are plain strings, but jsonb wants a JSON literal, so wrap
+            // the string as a JSON-string literal. Assistant inserts pass
+            // an array which the dbShim already JSON.stringify's.
+            content: JSON.stringify(lastUser.content ?? ""),
             files: lastUser.files ?? null,
             workflow: lastUser.workflow ?? null,
         });
@@ -439,7 +495,13 @@ chatRouter.post("/", requireAuth, async (req, res) => {
     const write = (line: string) => res.write(line);
 
     const apiKeys = await getUserApiKeys(userId, db);
-    const mcpServers = await loadEnabledMcpServersForUser(userId, db);
+    // Per-user connectors come first so they win any slug collision in
+    // findMcpServerForTool; built-in (system-side) MCPs follow.
+    const [userMcpServers, builtinMcpServers] = await Promise.all([
+        loadEnabledMcpServersForUser(userId, db),
+        loadBuiltinMcpServers(),
+    ]);
+    const mcpServers = [...userMcpServers, ...builtinMcpServers];
 
     try {
         write(`data: ${JSON.stringify({ type: "chat_id", chatId })}\n\n`);
@@ -456,6 +518,8 @@ chatRouter.post("/", requireAuth, async (req, res) => {
             apiKeys,
             projectId: project_id ?? null,
             mcpServers,
+            client: client ?? "web",
+            editMode: editMode ?? "track",
         });
 
         console.log("[chat/stream] LLM stream finished", {

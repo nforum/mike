@@ -6,6 +6,7 @@
     "scripts": {
         "dev": "next dev",
         "build": "next build",
+        "build:with-addin": "npm --prefix ../word-addin install --silent && npm --prefix ../word-addin run build && next build",
         "start": "next start",
         "lint": "eslint",
         "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",

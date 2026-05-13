@@ -10,6 +10,7 @@ import {
     User,
     ChevronDown,
     Check,
+    Download,
 } from "lucide-react";
 import { HeaderSearchBtn } from "../shared/HeaderSearchBtn";
 import {
@@ -20,9 +21,16 @@ import {
     unhideWorkflow,
 } from "@/app/lib/mikeApi";
 import type { MikeWorkflow } from "../shared/types";
-import { BUILT_IN_WORKFLOWS, BUILT_IN_IDS } from "./builtinWorkflows";
+import {
+    BUILT_IN_WORKFLOWS,
+    BUILT_IN_IDS,
+    getLocalizedPractice,
+    getLocalizedWorkflowTitle,
+} from "./builtinWorkflows";
 import { DisplayWorkflowModal } from "./DisplayWorkflowModal";
 import { NewWorkflowModal } from "./NewWorkflowModal";
+import { UploadWorkflowButton } from "./UploadWorkflowButton";
+import { downloadWorkflow } from "@/app/lib/workflowFile";
 import { ToolbarTabs } from "../shared/ToolbarTabs";
 import { RowActions } from "../shared/RowActions";
 import { MikeIcon } from "@/components/chat/mike-icon";
@@ -38,6 +46,8 @@ export function WorkflowList() {
     const t = useTranslations("workflowsPage");
     const tCommon = useTranslations("common");
     const tRowActions = useTranslations("rowActions");
+    const tBuiltinTitles = useTranslations("builtinWorkflows");
+    const tBuiltinPractices = useTranslations("builtinPractices");
     
     const tabs: { id: Tab; label: string }[] = [
         { id: "all", label: t("tabs.all") },
@@ -139,7 +149,13 @@ export function WorkflowList() {
     const filtered = byTab
         .filter((wf) => !practiceFilter || wf.practice === practiceFilter)
         .filter((wf) => !typeFilter || wf.type === typeFilter)
-        .filter((wf) => !q || wf.title.toLowerCase().includes(q));
+        .filter(
+            (wf) =>
+                !q ||
+                getLocalizedWorkflowTitle(wf, tBuiltinTitles)
+                    .toLowerCase()
+                    .includes(q),
+        );
 
     const allSelected =
         filtered.length > 0 &&
@@ -282,7 +298,9 @@ export function WorkflowList() {
                         : "text-gray-500 hover:text-gray-700"
                 }`}
             >
-                {practiceFilter ?? t("filterByPractice")}
+                {practiceFilter
+                    ? getLocalizedPractice(practiceFilter, tBuiltinPractices)
+                    : t("filterByPractice")}
                 <ChevronDown className="h-3 w-3" />
             </button>
             {practiceFilterOpen && (
@@ -311,7 +329,9 @@ export function WorkflowList() {
                             }}
                             className="flex items-center justify-between w-full px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
                         >
-                            <span className="truncate pr-2">{p}</span>
+                            <span className="truncate pr-2">
+                                {getLocalizedPractice(p, tBuiltinPractices)}
+                            </span>
                             {practiceFilter === p && (
                                 <Check className="h-3.5 w-3.5 shrink-0 text-gray-400" />
                             )}
@@ -372,6 +392,11 @@ export function WorkflowList() {
                         onChange={setSearch}
                         placeholder={t("searchPlaceholder")}
                     />
+                    <UploadWorkflowButton
+                        onUploaded={(wf) => {
+                            setCustom((prev) => [wf, ...prev]);
+                        }}
+                    />
                     <button
                         onClick={() => setNewModalOpen(true)}
                         className="flex items-center justify-center p-1.5 text-gray-500 hover:text-gray-900 transition-colors"
@@ -412,7 +437,7 @@ export function WorkflowList() {
                         <div className="ml-auto w-28 shrink-0">{t("columns.type")}</div>
                         <div className="w-40 shrink-0">{t("columns.practice")}</div>
                         <div className="w-28 shrink-0">{t("columns.source")}</div>
-                        <div className="w-8 shrink-0" />
+                        <div className="w-16 shrink-0" />
                     </div>
 
                     {loading && activeTab !== "builtin" ? (
@@ -435,7 +460,7 @@ export function WorkflowList() {
                                     <div className="w-28 shrink-0">
                                         <div className="h-3 w-14 rounded bg-gray-100 animate-pulse" />
                                     </div>
-                                    <div className="w-8 shrink-0" />
+                                    <div className="w-16 shrink-0" />
                                 </div>
                             ))}
                         </div>
@@ -503,7 +528,7 @@ export function WorkflowList() {
                                 </div>
                                 <div className={`sticky left-8 z-[60] ${NAME_COL_W} p-2 ${rowBg} group-hover:bg-gray-50`}>
                                     <span className="text-sm text-gray-800 truncate block">
-                                        {wf.title}
+                                        {getLocalizedWorkflowTitle(wf, tBuiltinTitles)}
                                     </span>
                                 </div>
                                 <div className="ml-auto w-28 shrink-0">
@@ -523,7 +548,7 @@ export function WorkflowList() {
                                 <div className="w-40 shrink-0">
                                     {wf.practice ? (
                                         <span className="text-xs font-medium text-gray-600">
-                                            {wf.practice}
+                                            {getLocalizedPractice(wf.practice, tBuiltinPractices)}
                                         </span>
                                     ) : (
                                         <span className="text-xs text-gray-300">
@@ -552,9 +577,19 @@ export function WorkflowList() {
                                     )}
                                 </div>
                                 <div
-                                    className="w-8 shrink-0 flex justify-end"
+                                    className="w-16 shrink-0 flex items-center justify-end gap-1"
                                     onClick={(e) => e.stopPropagation()}
                                 >
+                                    {activeTab !== "hidden" && (
+                                        <button
+                                            onClick={() => downloadWorkflow(wf)}
+                                            aria-label={t("downloadAria")}
+                                            title={t("downloadAria")}
+                                            className="flex items-center justify-center p-1 text-gray-400 hover:text-gray-900 transition-colors"
+                                        >
+                                            <Download className="h-3.5 w-3.5" />
+                                        </button>
+                                    )}
                                     {wf.is_system ? (
                                         activeTab === "hidden" ? (
                                             <RowActions

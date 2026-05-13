@@ -58,6 +58,7 @@ import { RowActions } from "@/app/components/shared/RowActions";
 import { AddDocumentsModal } from "@/app/components/shared/AddDocumentsModal";
 import { PeopleModal } from "@/app/components/shared/PeopleModal";
 import { OwnerOnlyModal } from "@/app/components/shared/OwnerOnlyModal";
+import { useConfirmDialog } from "@/app/components/modals/confirm-dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { UploadNewVersionModal } from "@/app/components/shared/UploadNewVersionModal";
 import { DocViewModal } from "@/app/components/shared/DocViewModal";
@@ -274,6 +275,9 @@ function DocVersionHistory({
 
 export function ProjectPage({ projectId }: Props) {
     const tProject = useTranslations("projectPage");
+    const tDelete = useTranslations("confirmDelete");
+    const { confirm: confirmDialog, dialog: confirmDialogEl } =
+        useConfirmDialog();
     const [project, setProject] = useState<MikeProject | null>(null);
     const [folders, setFolders] = useState<MikeFolder[]>([]);
     const [chats, setChats] = useState<MikeChat[]>([]);
@@ -780,6 +784,15 @@ export function ProjectPage({ projectId }: Props) {
             return !c || !user?.id || c.user_id === user.id;
         });
         const blocked = ids.length - owned.length;
+        if (owned.length > 0) {
+            const ok = await confirmDialog({
+                title: tDelete("chatsTitle"),
+                message: tDelete("chatsBody", { count: owned.length }),
+                confirmLabel: tDelete("deleteAction"),
+                destructive: true,
+            });
+            if (!ok) return;
+        }
         setSelectedChatIds([]);
         await Promise.all(owned.map((id) => deleteChat(id).catch(() => {})));
         setChats((prev) => prev.filter((c) => !owned.includes(c.id)));
@@ -798,6 +811,15 @@ export function ProjectPage({ projectId }: Props) {
             return !r || !user?.id || r.user_id === user.id;
         });
         const blocked = ids.length - owned.length;
+        if (owned.length > 0) {
+            const ok = await confirmDialog({
+                title: tDelete("reviewsTitle"),
+                message: tDelete("reviewsBody", { count: owned.length }),
+                confirmLabel: tDelete("deleteAction"),
+                destructive: true,
+            });
+            if (!ok) return;
+        }
         setSelectedReviewIds([]);
         await Promise.all(owned.map((id) => deleteTabularReview(id).catch(() => {})));
         setProjectReviews((prev) => prev.filter((r) => !owned.includes(r.id)));
@@ -1619,6 +1641,16 @@ export function ProjectPage({ projectId }: Props) {
                                                         setOwnerOnlyAction("delete this chat");
                                                         return;
                                                     }
+                                                    const trimmed = chat.title?.trim();
+                                                    const ok = await confirmDialog({
+                                                        title: tDelete("chatTitle"),
+                                                        message: trimmed
+                                                            ? tDelete("chatBodyNamed", { title: trimmed })
+                                                            : tDelete("chatBody"),
+                                                        confirmLabel: tDelete("deleteAction"),
+                                                        destructive: true,
+                                                    });
+                                                    if (!ok) return;
                                                     await deleteChat(chat.id);
                                                     setChats((prev) => prev.filter((c) => c.id !== chat.id));
                                                 }}
@@ -1700,6 +1732,16 @@ export function ProjectPage({ projectId }: Props) {
                                                         setOwnerOnlyAction(tProject("deleteReview"));
                                                         return;
                                                     }
+                                                    const trimmed = review.title?.trim();
+                                                    const ok = await confirmDialog({
+                                                        title: tDelete("reviewTitle"),
+                                                        message: trimmed
+                                                            ? tDelete("reviewBodyNamed", { title: trimmed })
+                                                            : tDelete("reviewBody"),
+                                                        confirmLabel: tDelete("deleteAction"),
+                                                        destructive: true,
+                                                    });
+                                                    if (!ok) return;
                                                     await deleteTabularReview(review.id);
                                                     setProjectReviews((prev) => prev.filter((r) => r.id !== review.id));
                                                 }}
@@ -1756,6 +1798,8 @@ export function ProjectPage({ projectId }: Props) {
                 action={ownerOnlyAction ?? undefined}
                 onClose={() => setOwnerOnlyAction(null)}
             />
+
+            {confirmDialogEl}
 
             <PeopleModal
                 open={peopleModalOpen}

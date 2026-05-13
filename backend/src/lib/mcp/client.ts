@@ -1,6 +1,6 @@
 // Thin wrapper around the MCP TypeScript SDK's Streamable-HTTP client.
 //
-// Mike opens one client per (user, MCP server) per chat request. Connections
+// Max opens one client per (user, MCP server) per chat request. Connections
 // are short-lived: we initialize, list tools, run any tools the model calls,
 // then close in a `finally` on the request handler. There is no connection
 // pool — each chat request pays an `initialize` round-trip per enabled

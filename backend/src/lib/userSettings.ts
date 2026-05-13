@@ -1,6 +1,7 @@
 import { createServerSupabase } from "./supabase";
 import {
     resolveModel,
+    DEFAULT_MAIN_MODEL,
     DEFAULT_TITLE_MODEL,
     DEFAULT_TABULAR_MODEL,
     type UserApiKeys,
@@ -11,7 +12,42 @@ export type UserModelSettings = {
     title_model: string;
     tabular_model: string;
     api_keys: UserApiKeys;
+    /**
+     * UI locale the user selected (mirrors the value the frontend uses
+     * via next-intl). We honor this in title generation and any other
+     * lightweight LLM call where the result lands directly in the UI,
+     * so a Croatian-speaking user gets Croatian chat titles even when
+     * their first message was in English.
+     */
+    preferred_language: string;
 };
+
+/**
+ * Pick a sensible main-chat model when the client didn't send one.
+ *
+ * The Word add-in deliberately ships without a model picker — the user
+ * configures preferred providers in the Max web app once, and the
+ * add-in should "just work". Order of preference roughly mirrors the
+ * web app's per-message defaults:
+ *
+ *   1. LocalLLM (if the operator wired up an in-house endpoint)
+ *   2. Claude  — Sonnet 4.6 for main chat
+ *   3. Gemini  — 3.1 Pro
+ *   4. Mistral — Large
+ *   5. OpenAI  — gpt-5.5 (last because OpenAI cost / latency is highest)
+ *
+ * If none of the above are available, we fall back to `DEFAULT_MAIN_MODEL`
+ * and let the downstream OpenAI client surface its own credentials error,
+ * which is at least obvious in logs.
+ */
+export function resolveDefaultMainModel(apiKeys?: UserApiKeys): string {
+    if (process.env.VLLM_BASE_URL?.trim()) return "localllm-main";
+    if (apiKeys?.claude?.trim()) return "claude-sonnet-4-6";
+    if (apiKeys?.gemini?.trim()) return "gemini-3.1-pro-preview";
+    if (apiKeys?.mistral?.trim()) return "mistral-large-latest";
+    if (apiKeys?.openai?.trim()) return "gpt-5.5";
+    return DEFAULT_MAIN_MODEL;
+}
 
 // Title generation is a lightweight task — always routed to the cheapest model
 // of whichever provider the user has keys for: LocalLLM lite if available, 
@@ -21,10 +57,20 @@ function resolveTitleModel(apiKeys: UserApiKeys): string {
     if (process.env.VLLM_BASE_URL?.trim()) {
         return "localllm-lite";
     }
+    // User-level keys take priority
     if (apiKeys.gemini?.trim()) return DEFAULT_TITLE_MODEL;
     if (apiKeys.claude?.trim()) return "claude-haiku-4-5";
     if (apiKeys.openai?.trim()) return "gpt-5.4-nano";
-    if (apiKeys.mistral?.trim() || process.env.MISTRAL_API_KEY?.trim()) return "mistral-small-latest";
+    if (apiKeys.mistral?.trim()) return "mistral-small-latest";
+    // Fall back to server-level env keys
+    if (process.env.GEMINI_API_KEY?.trim()) return DEFAULT_TITLE_MODEL;
+    if (
+        process.env.ANTHROPIC_API_KEY?.trim() ||
+        process.env.CLAUDE_API_KEY?.trim()
+    )
+        return "claude-haiku-4-5";
+    if (process.env.OPENAI_API_KEY?.trim()) return "gpt-5.4-nano";
+    if (process.env.MISTRAL_API_KEY?.trim()) return "mistral-small-latest";
     return DEFAULT_TITLE_MODEL;
 }
 
@@ -44,24 +90,54 @@ export async function getUserModelSettings(
     db?: ReturnType<typeof createServerSupabase>,
 ): Promise<UserModelSettings> {
     const client = db ?? createServerSupabase();
-    const { data } = await client
+    const { data, error } = await client
         .from("user_profiles")
-        .select("tabular_model, claude_api_key, gemini_api_key, openai_api_key, mistral_api_key")
+        .select("tabular_model, preferred_language, claude_api_key, gemini_api_key, openai_api_key, mistral_api_key")
         .eq("user_id", userId)
         .single();
 
+    if (error) {
+        // Most likely cause: a column referenced in SELECT doesn't exist yet
+        // (schema out of sync with code). Log and continue with null data so
+        // the caller gets safe defaults instead of crashing.
+        console.error("[userSettings] user_profiles query failed:", error.message);
+    }
+
     const api_keys: UserApiKeys = {
-        claude: safeDecrypt(data?.claude_api_key),
-        gemini: safeDecrypt(data?.gemini_api_key),
-        openai: safeDecrypt(data?.openai_api_key) ?? process.env.VLLM_API_KEY ?? null,
-        mistral: safeDecrypt(data?.mistral_api_key),
+        claude: safeDecrypt(data?.claude_api_key) ?? serverClaudeKey(),
+        gemini: safeDecrypt(data?.gemini_api_key) ?? process.env.GEMINI_API_KEY ?? null,
+        openai: safeDecrypt(data?.openai_api_key) ?? process.env.OPENAI_API_KEY ?? process.env.VLLM_API_KEY ?? null,
+        mistral: safeDecrypt(data?.mistral_api_key) ?? process.env.MISTRAL_API_KEY ?? null,
     };
+
+    const SUPPORTED = new Set(["en", "hr"]);
+    const lang =
+        typeof data?.preferred_language === "string" &&
+        SUPPORTED.has(data.preferred_language)
+            ? data.preferred_language
+            : "hr";
 
     return {
         title_model: resolveTitleModel(api_keys),
         tabular_model: resolveModel(data?.tabular_model, "localllm-main"),
         api_keys,
+        preferred_language: lang,
     };
+}
+
+/**
+ * Server-level Anthropic key fallback. Prefer `ANTHROPIC_API_KEY` (the
+ * canonical name Anthropic's own SDK + `.env.example` use); accept the
+ * legacy `CLAUDE_API_KEY` for backwards compatibility with older
+ * deployments. Returning a non-empty server key here means the user
+ * doesn't need to paste their own key in Settings — Max just works.
+ */
+function serverClaudeKey(): string | null {
+    const fromAnthropic = process.env.ANTHROPIC_API_KEY?.trim();
+    if (fromAnthropic) return fromAnthropic;
+    const legacy = process.env.CLAUDE_API_KEY?.trim();
+    if (legacy) return legacy;
+    return null;
 }
 
 export async function getUserApiKeys(
@@ -69,15 +145,18 @@ export async function getUserApiKeys(
     db?: ReturnType<typeof createServerSupabase>,
 ): Promise<UserApiKeys> {
     const client = db ?? createServerSupabase();
-    const { data } = await client
+    const { data, error } = await client
         .from("user_profiles")
         .select("claude_api_key, gemini_api_key, openai_api_key, mistral_api_key")
         .eq("user_id", userId)
         .single();
+    if (error) {
+        console.error("[userSettings] getUserApiKeys query failed:", error.message);
+    }
     return {
-        claude: safeDecrypt(data?.claude_api_key),
-        gemini: safeDecrypt(data?.gemini_api_key),
-        openai: safeDecrypt(data?.openai_api_key) ?? process.env.VLLM_API_KEY ?? null,
-        mistral: safeDecrypt(data?.mistral_api_key),
+        claude: safeDecrypt(data?.claude_api_key) ?? serverClaudeKey(),
+        gemini: safeDecrypt(data?.gemini_api_key) ?? process.env.GEMINI_API_KEY ?? null,
+        openai: safeDecrypt(data?.openai_api_key) ?? process.env.OPENAI_API_KEY ?? process.env.VLLM_API_KEY ?? null,
+        mistral: safeDecrypt(data?.mistral_api_key) ?? process.env.MISTRAL_API_KEY ?? null,
     };
 }

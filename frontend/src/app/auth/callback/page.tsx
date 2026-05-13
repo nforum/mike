@@ -2,14 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { exchangeCodeForTokens } from "@/lib/oauth";
+import {
+    exchangeCodeForTokens,
+    consumePostLoginRedirect,
+} from "@/lib/oauth";
+import { useAuth } from "@/contexts/AuthContext";
 import { SiteLogo } from "@/components/site-logo";
 import { Suspense } from "react";
 
 function CallbackHandler() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { isAuthenticated } = useAuth();
     const [error, setError] = useState<string | null>(null);
+    const [tokensReady, setTokensReady] = useState(false);
+    const [pendingNext, setPendingNext] = useState<string | null>(null);
 
     useEffect(() => {
         const code = searchParams.get("code");
@@ -29,13 +36,26 @@ function CallbackHandler() {
 
         exchangeCodeForTokens(code, state)
             .then(() => {
-                router.replace("/assistant");
+                // storeTokens() inside exchangeCodeForTokens dispatches
+                // AUTH_TOKEN_EVENT which kicks AuthContext.loadUser().
+                // We defer the actual route replace until isAuthenticated
+                // flips to true, so the destination layout never sees a
+                // stale unauthenticated state (which would bounce us
+                // back to /login and force a second click).
+                setPendingNext(consumePostLoginRedirect() ?? "/assistant");
+                setTokensReady(true);
             })
             .catch((err: Error) => {
                 console.error("[auth/callback] Token exchange failed:", err);
                 setError(err.message || "Authentication failed. Please try again.");
             });
-    }, [searchParams, router]);
+    }, [searchParams]);
+
+    useEffect(() => {
+        if (tokensReady && isAuthenticated && pendingNext) {
+            router.replace(pendingNext);
+        }
+    }, [tokensReady, isAuthenticated, pendingNext, router]);
 
     if (error) {
         return (

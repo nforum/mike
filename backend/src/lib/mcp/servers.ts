@@ -3,7 +3,7 @@
 // Called once at the top of each chat request. Reads the user's enabled MCP
 // servers from Postgres, opens a Streamable-HTTP client to each in parallel,
 // fetches its tool list, and converts each tool to the OpenAI-style schema
-// Mike's LLM adapter speaks. Tool names are prefixed with `mcp__<slug>__` so
+// Max's LLM adapter speaks. Tool names are prefixed with `mcp__<slug>__` so
 // the dispatcher in chatTools can route calls back to the right server.
 
 import { createHash } from "crypto";

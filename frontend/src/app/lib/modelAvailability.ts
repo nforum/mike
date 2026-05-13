@@ -7,6 +7,19 @@ export type ApiKeys = {
     geminiApiKey: string | null;
     openaiApiKey: string | null;
     mistralApiKey: string | null;
+    /**
+     * Optional per-provider "server has a fallback key" flags from
+     * GET /user/profile (see backend `serverKeyAvailability()`). When
+     * a provider has a server-level key we treat the model as
+     * available even if the user hasn't pasted their own — the
+     * backend will pick up `process.env.<PROVIDER>_API_KEY` for them.
+     */
+    serverKeys?: {
+        claude?: boolean;
+        gemini?: boolean;
+        openai?: boolean;
+        mistral?: boolean;
+    };
 };
 
 export function getModelProvider(modelId: string): ModelProvider | null {
@@ -18,6 +31,19 @@ export function getModelProvider(modelId: string): ModelProvider | null {
     return "gemini";
 }
 
+function hasKey(
+    provider: ModelProvider,
+    apiKeys: ApiKeys,
+): boolean {
+    if (provider === "claude")
+        return !!apiKeys.claudeApiKey?.trim() || !!apiKeys.serverKeys?.claude;
+    if (provider === "openai")
+        return !!apiKeys.openaiApiKey?.trim() || !!apiKeys.serverKeys?.openai;
+    if (provider === "mistral")
+        return !!apiKeys.mistralApiKey?.trim() || !!apiKeys.serverKeys?.mistral;
+    return !!apiKeys.geminiApiKey?.trim() || !!apiKeys.serverKeys?.gemini;
+}
+
 export function isModelAvailable(
     modelId: string,
     apiKeys: ApiKeys,
@@ -27,20 +53,14 @@ export function isModelAvailable(
     // LocalLLM models are server-configured, always available
     const model = MODELS.find((m) => m.id === modelId);
     if (model?.group === "LocalLLM") return true;
-    if (provider === "claude") return !!apiKeys.claudeApiKey?.trim();
-    if (provider === "openai") return !!apiKeys.openaiApiKey?.trim();
-    if (provider === "mistral") return !!apiKeys.mistralApiKey?.trim();
-    return !!apiKeys.geminiApiKey?.trim();
+    return hasKey(provider, apiKeys);
 }
 
 export function isProviderAvailable(
     provider: ModelProvider,
     apiKeys: ApiKeys,
 ): boolean {
-    if (provider === "claude") return !!apiKeys.claudeApiKey?.trim();
-    if (provider === "openai") return !!apiKeys.openaiApiKey?.trim();
-    if (provider === "mistral") return !!apiKeys.mistralApiKey?.trim();
-    return !!apiKeys.geminiApiKey?.trim();
+    return hasKey(provider, apiKeys);
 }
 
 export function providerLabel(provider: ModelProvider): string {

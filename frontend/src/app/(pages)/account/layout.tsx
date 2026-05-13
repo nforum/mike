@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface TabDef {
     id: string;
-    labelKey: "general" | "models" | "connectors";
+    labelKey: "general" | "models" | "connectors" | "fileSources" | "wordAddin";
     href: string;
 }
 
@@ -16,6 +16,8 @@ const TABS: TabDef[] = [
     { id: "general", labelKey: "general", href: "/account" },
     { id: "models", labelKey: "models", href: "/account/models" },
     { id: "mcp", labelKey: "connectors", href: "/account/mcp" },
+    { id: "files", labelKey: "fileSources", href: "/account/connectors" },
+    { id: "word", labelKey: "wordAddin", href: "/account/word" },
 ];
 
 export default function AccountLayout({

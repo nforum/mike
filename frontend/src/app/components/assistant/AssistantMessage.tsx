@@ -17,6 +17,10 @@ import type {
 import { EditCard, applyOptimisticResolution } from "./EditCard";
 import { PreResponseWrapper } from "../shared/PreResponseWrapper";
 import { supabase } from "@/lib/supabase";
+import { useTranslations } from "next-intl";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TFunc = (key: string, values?: Record<string, any>) => string;
 
 /**
  * Card rendered above the per-edit EditCards when a message produced
@@ -36,6 +40,7 @@ function BulkEditActions({
     onResolveStart,
     onResolved,
     onError,
+    t,
 }: {
     pending: {
         annotation: MikeEditAnnotation;
@@ -61,6 +66,7 @@ function BulkEditActions({
         versionId: string | null;
         message: string;
     }) => void;
+    t: TFunc;
 }) {
     const [busy, setBusy] = useState<"accept" | "reject" | null>(null);
     const [progress, setProgress] = useState<{
@@ -80,7 +86,7 @@ function BulkEditActions({
             } = await supabase.auth.getSession();
             const token = session?.access_token;
             const apiBase =
-                process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
+                process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "http://localhost:3001";
 
             // Sequential so the per-document version counter advances in a
             // predictable order and the viewer doesn't race between bumps.
@@ -172,7 +178,7 @@ function BulkEditActions({
                 {busy === "accept" && (
                     <Loader2 className="h-3 w-3 animate-spin" />
                 )}
-                Accept all
+                {t("acceptAll")}
             </button>
             <button
                 onClick={() => handleAll("reject")}
@@ -182,7 +188,7 @@ function BulkEditActions({
                 {busy === "reject" && (
                     <Loader2 className="h-3 w-3 animate-spin" />
                 )}
-                Reject all
+                {t("rejectAll")}
             </button>
             {progress && (
                 <span className="text-xs font-serif text-gray-500">
@@ -197,7 +203,7 @@ function BulkEditActions({
                     disabled={!!busy}
                     className="ml-auto px-2 py-1 text-xs rounded border border-gray-200 bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                 >
-                    View
+                    {t("view")}
                 </button>
             )}
         </div>
@@ -218,6 +224,7 @@ function EditCardsSection({
     onResolveStart,
     onResolved,
     onError,
+    t,
 }: {
     pending: {
         annotation: MikeEditAnnotation;
@@ -245,6 +252,7 @@ function EditCardsSection({
         versionId: string | null;
         message: string;
     }) => void;
+    t: TFunc;
 }) {
     const [isOpen, setIsOpen] = useState(true);
     if (cards.length === 0) return null;
@@ -253,11 +261,11 @@ function EditCardsSection({
     const summary =
         pending.length > 0
             ? docCount > 1
-                ? `${pending.length} tracked changes across ${docCount} documents`
-                : `${pending.length} tracked ${pending.length === 1 ? "change" : "changes"}`
+                ? t("trackedChangesAcrossDocs", { changeCount: pending.length, docCount })
+                : t("trackedChanges", { count: pending.length })
             : docCount > 1
-              ? `${resolvedCount} resolved tracked changes across ${docCount} documents`
-              : `${resolvedCount} resolved tracked ${resolvedCount === 1 ? "change" : "changes"}`;
+              ? t("resolvedChangesAcrossDocs", { changeCount: resolvedCount, docCount })
+              : t("resolvedChanges", { count: resolvedCount });
 
     return (
         <div className="border border-gray-200 rounded-lg bg-white overflow-hidden">
@@ -268,7 +276,7 @@ function EditCardsSection({
                 </p>
                 <button
                     onClick={() => setIsOpen((v) => !v)}
-                    aria-label={isOpen ? "Collapse edits" : "Expand edits"}
+                    aria-label={isOpen ? t("collapseEdits") : t("expandEdits")}
                     className="shrink-0 rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors"
                 >
                     <ChevronDown
@@ -286,6 +294,7 @@ function EditCardsSection({
                         onResolveStart={onResolveStart}
                         onResolved={onResolved}
                         onError={onError}
+                        t={t}
                     />
                 </div>
             )}
@@ -344,22 +353,24 @@ function ResponseStatus({ status }: { status: StatusState }) {
 // Event block components
 // ---------------------------------------------------------------------------
 
-const THINKING_PHRASES = [
-    "Thinking...",
-    "Pondering...",
-    "Analyzing...",
-    "Reviewing...",
-    "Reasoning...",
-];
+const THINKING_KEYS = [
+    "thinking",
+    "pondering",
+    "analyzing",
+    "reviewing",
+    "reasoning",
+] as const;
 
 function ReasoningBlock({
     text,
     isStreaming,
     showConnector,
+    t,
 }: {
     text: string;
     isStreaming: boolean;
     showConnector?: boolean;
+    t: TFunc;
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const [thinkingIndex, setThinkingIndex] = useState(0);
@@ -367,7 +378,7 @@ function ReasoningBlock({
     useEffect(() => {
         if (!isStreaming) return;
         const interval = setInterval(() => {
-            setThinkingIndex((i) => (i + 1) % THINKING_PHRASES.length);
+            setThinkingIndex((i) => (i + 1) % THINKING_KEYS.length);
         }, 2000);
         return () => clearInterval(interval);
     }, [isStreaming]);
@@ -390,8 +401,8 @@ function ReasoningBlock({
                 )}
                 <span className="font-medium ml-2">
                     {isStreaming
-                        ? THINKING_PHRASES[thinkingIndex]
-                        : "Thought process"}
+                        ? t(THINKING_KEYS[thinkingIndex])
+                        : t("thoughtProcess")}
                 </span>
                 {!isStreaming && (
                     <ChevronDown
@@ -428,6 +439,7 @@ function McpToolResultBlock({
     args,
     output,
     showConnector,
+    t,
 }: {
     server: string;
     tool: string;
@@ -435,6 +447,7 @@ function McpToolResultBlock({
     args: string;
     output: string;
     showConnector?: boolean;
+    t: TFunc;
 }) {
     const [expanded, setExpanded] = useState(false);
     const prettyArgs = (() => {
@@ -466,7 +479,7 @@ function McpToolResultBlock({
                     onClick={() => setExpanded((v) => !v)}
                     className="ml-2 min-w-0 flex-1 text-left hover:text-gray-700 transition-colors"
                 >
-                    <span className="font-medium">{ok ? "Called" : "Failed"}</span>{" "}
+                    <span className="font-medium">{ok ? t("called") : t("failed")}</span>{" "}
                     <span>
                         {server} · {tool}
                     </span>
@@ -476,7 +489,7 @@ function McpToolResultBlock({
                         </span>
                     )}
                     <span className="ml-2 text-xs text-gray-400">
-                        {expanded ? "Hide" : "Show"} details
+                        {expanded ? t("hideDetails") : t("showDetails")}
                     </span>
                 </button>
             </div>
@@ -484,18 +497,18 @@ function McpToolResultBlock({
                 <div className="ml-3.5 mt-2 space-y-2 border-l-2 border-gray-200 pl-3">
                     <div>
                         <div className="text-[11px] uppercase tracking-wider text-gray-400 mb-1">
-                            Arguments
+                            {t("arguments")}
                         </div>
                         <pre className="text-xs font-mono bg-gray-50 border border-gray-200 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
-                            {prettyArgs || "(none)"}
+                            {prettyArgs || t("none")}
                         </pre>
                     </div>
                     <div>
                         <div className="text-[11px] uppercase tracking-wider text-gray-400 mb-1">
-                            Output
+                            {t("output")}
                         </div>
                         <pre className="text-xs font-mono bg-gray-50 border border-gray-200 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words max-h-72 overflow-y-auto">
-                            {output || "(empty)"}
+                            {output || t("empty")}
                         </pre>
                     </div>
                 </div>
@@ -509,11 +522,13 @@ function DocReadBlock({
     onClick,
     showConnector,
     isStreaming,
+    t,
 }: {
     filename: string;
     onClick?: () => void;
     showConnector?: boolean;
     isStreaming?: boolean;
+    t: TFunc;
 }) {
     return (
         <div className="flex items-start text-sm font-serif text-gray-500 relative">
@@ -527,7 +542,7 @@ function DocReadBlock({
             )}
             <div className="ml-2 min-w-0 flex-1 whitespace-normal break-words">
                 <span className="font-medium">
-                    {isStreaming ? "Reading" : "Read"}
+                    {isStreaming ? t("reading") : t("read")}
                 </span>{" "}
                 {isStreaming ? (
                     <span>{filename}...</span>
@@ -552,17 +567,19 @@ function DocFindBlock({
     totalMatches,
     isStreaming,
     showConnector,
+    t,
 }: {
     filename: string;
     query: string;
     totalMatches: number;
     isStreaming?: boolean;
     showConnector?: boolean;
+    t: TFunc;
 }) {
-    const label = isStreaming ? "Finding" : "Found";
+    const label = isStreaming ? t("finding") : t("found");
     const matchSuffix = isStreaming
         ? ""
-        : ` (${totalMatches} ${totalMatches === 1 ? "match" : "matches"})`;
+        : ` (${t("matchCount", { count: totalMatches })})`;
     return (
         <div className="flex items-start text-sm font-serif text-gray-500 relative">
             {showConnector && (
@@ -579,7 +596,7 @@ function DocFindBlock({
                 <span className="font-medium">{label}</span>{" "}
                 <span>
                     &ldquo;{query}&rdquo;{matchSuffix}
-                    <span className="ml-1 text-gray-400">in {filename}</span>
+                    <span className="ml-1 text-gray-400">{t("inFile", { filename })}</span>
                     {isStreaming && "..."}
                 </span>
             </div>
@@ -591,10 +608,12 @@ function DocCreatedBlock({
     filename,
     showConnector,
     isStreaming,
+    t,
 }: {
     filename: string;
     showConnector?: boolean;
     isStreaming?: boolean;
+    t: TFunc;
 }) {
     return (
         <div className="flex items-start text-sm font-serif text-gray-500 relative">
@@ -608,7 +627,7 @@ function DocCreatedBlock({
             )}
             <div className="ml-2 min-w-0 flex-1 whitespace-normal break-words">
                 <span className="font-medium">
-                    {isStreaming ? "Creating" : "Created"}
+                    {isStreaming ? t("creating") : t("created")}
                 </span>{" "}
                 <span>{isStreaming ? `${filename}...` : filename}</span>
             </div>
@@ -622,6 +641,7 @@ function DocReplicatedBlock({
     showConnector,
     isStreaming,
     hasError,
+    t,
 }: {
     filename: string;
     /**
@@ -632,10 +652,11 @@ function DocReplicatedBlock({
     showConnector?: boolean;
     isStreaming?: boolean;
     hasError?: boolean;
+    t: TFunc;
 }) {
-    const label = isStreaming ? "Replicating" : "Replicated";
+    const label = isStreaming ? t("replicating") : t("replicated");
     const suffix =
-        !isStreaming && count > 1 ? ` ${count} times` : isStreaming ? "..." : "";
+        !isStreaming && count > 1 ? ` ${t("replicatedTimes", { count })}` : isStreaming ? "..." : "";
     return (
         <div className="flex items-start text-sm font-serif text-gray-500 relative">
             {showConnector && (
@@ -689,7 +710,7 @@ function DocDownloadBlock({
     // the user's bearer token, so any absolute URL from tool output is
     // refused to keep the token from leaking off-origin.
     const API_BASE =
-        process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
+        process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "http://localhost:3001";
     const isSafeHref = download_url.startsWith("/");
     const href = isSafeHref ? `${API_BASE}${download_url}` : null;
     const [busy, setBusy] = useState(false);
@@ -804,10 +825,12 @@ function WorkflowAppliedBlock({
     title,
     showConnector,
     onClick,
+    t,
 }: {
     title: string;
     showConnector?: boolean;
     onClick?: () => void;
+    t: TFunc;
 }) {
     return (
         <div className="flex items-start text-sm font-serif text-gray-500 relative">
@@ -816,7 +839,7 @@ function WorkflowAppliedBlock({
             )}
             <div className="mt-2 w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
             <div className="ml-2 min-w-0 flex-1 whitespace-normal break-words">
-                <span className="font-medium">Applied Workflow</span>{" "}
+                <span className="font-medium">{t("appliedWorkflow")}</span>{" "}
                 {onClick ? (
                     <button
                         onClick={onClick}
@@ -837,11 +860,13 @@ function DocEditedBlock({
     showConnector,
     isStreaming,
     hasError,
+    t,
 }: {
     filename: string;
     showConnector?: boolean;
     isStreaming?: boolean;
     hasError?: boolean;
+    t: TFunc;
 }) {
     return (
         <div className="flex items-start text-sm font-serif text-gray-500 relative">
@@ -858,10 +883,10 @@ function DocEditedBlock({
             <div className="ml-2 min-w-0 flex-1 whitespace-normal break-words">
                 <span className="font-medium">
                     {isStreaming
-                        ? "Editing"
+                        ? t("editing")
                         : hasError
-                          ? "Edit failed"
-                          : "Edited"}
+                          ? t("editFailed")
+                          : t("edited")}
                 </span>{" "}
                 <span>{isStreaming ? `${filename}...` : filename}</span>
             </div>
@@ -1079,7 +1104,7 @@ interface Props {
     events?: AssistantEvent[];
     isStreaming?: boolean;
     isError?: boolean;
-    /** Human-readable error text rendered alongside the red Mike icon. */
+    /** Human-readable error text rendered alongside the red Max icon. */
     errorMessage?: string;
     annotations?: MikeCitationAnnotation[];
     onCitationClick?: (citation: MikeCitationAnnotation) => void;
@@ -1157,6 +1182,7 @@ export function AssistantMessage({
     resolvedEditStatuses,
 }: Props) {
     const messageKey = useId();
+    const t = useTranslations("streaming");
     const contentDivRef = useRef<HTMLDivElement | null>(null);
     const [isCopied, setIsCopied] = useState(false);
     // Per-document override of the download URL, set as Accept/Reject resolves
@@ -1307,6 +1333,7 @@ export function AssistantMessage({
                     text={event.text}
                     isStreaming={!!event.isStreaming}
                     showConnector={showConnector}
+                    t={t}
                 />
             );
         }
@@ -1320,13 +1347,13 @@ export function AssistantMessage({
                         <div className="absolute bottom-0 w-[1px] bg-gray-300 top-[13px] left-[2.5px] h-[calc(100%+11px)]" />
                     )}
                     <div className="w-1.5 h-1.5 rounded-full border border-gray-400 border-t-transparent animate-spin shrink-0" />
-                    <span className="font-medium ml-2">Running</span>
+                    <span className="font-medium ml-2">{t("running")}</span>
                     <span className="ml-1">
                         {event.display_name
                             ? `${event.display_name}...`
                             : event.name
                               ? `${event.name}...`
-                              : "tool..."}
+                              : `${t("tool")}...`}
                     </span>
                 </div>
             );
@@ -1341,7 +1368,7 @@ export function AssistantMessage({
                         <div className="absolute bottom-0 w-[1px] bg-gray-300 top-[13px] left-[2.5px] h-[calc(100%+11px)]" />
                     )}
                     <div className="w-1.5 h-1.5 rounded-full border border-gray-400 border-t-transparent animate-spin shrink-0" />
-                    <span className="ml-2">Thinking...</span>
+                    <span className="ml-2">{t("thinking")}</span>
                 </div>
             );
         }
@@ -1358,6 +1385,7 @@ export function AssistantMessage({
                             : undefined
                     }
                     showConnector={showConnector}
+                    t={t}
                 />
             );
         }
@@ -1370,6 +1398,7 @@ export function AssistantMessage({
                     totalMatches={event.total_matches}
                     isStreaming={!!event.isStreaming}
                     showConnector={showConnector}
+                    t={t}
                 />
             );
         }
@@ -1380,6 +1409,7 @@ export function AssistantMessage({
                     filename={event.filename}
                     isStreaming={event.isStreaming}
                     showConnector={showConnector}
+                    t={t}
                 />
             );
         }
@@ -1395,6 +1425,7 @@ export function AssistantMessage({
                     isStreaming={!!event.isStreaming}
                     hasError={!!event.error}
                     showConnector={showConnector}
+                    t={t}
                 />
             );
         }
@@ -1406,6 +1437,7 @@ export function AssistantMessage({
                     isStreaming={event.isStreaming}
                     hasError={!!event.error}
                     showConnector={showConnector}
+                    t={t}
                 />
             );
         }
@@ -1420,6 +1452,7 @@ export function AssistantMessage({
                             ? () => onWorkflowClick(event.workflow_id)
                             : undefined
                     }
+                    t={t}
                 />
             );
         }
@@ -1433,6 +1466,7 @@ export function AssistantMessage({
                     args={event.args}
                     output={event.output}
                     showConnector={showConnector}
+                    t={t}
                 />
             );
         }
@@ -1576,6 +1610,7 @@ export function AssistantMessage({
                                         onResolveStart={onEditResolveStart}
                                         onResolved={handleEditResolved}
                                         onError={onEditError}
+                                        t={t}
                                     />
                                 );
                             })()}

@@ -94,6 +94,7 @@ export function TRView({ reviewId, projectId }: Props) {
         geminiApiKey: profile?.geminiApiKey ?? null,
         openaiApiKey: profile?.openaiApiKey ?? null,
         mistralApiKey: profile?.mistralApiKey ?? null,
+        serverKeys: profile?.serverKeys,
     };
     const tabularModel = profile?.tabularModel ?? "gemini-3-flash-preview";
 

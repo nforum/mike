@@ -89,14 +89,11 @@ export function McpToggleButton() {
                     } ${open ? "bg-gray-100" : ""}`}
                 >
                     <Plug className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">
-                        {t("connectors")}
-                        {enabledCount > 0 && totalCount > 0 && (
-                            <span className="ml-1 text-xs text-blue-600 font-medium">
-                                {enabledCount}
-                            </span>
-                        )}
-                    </span>
+                    {enabledCount > 0 && totalCount > 0 && (
+                        <span className="text-xs font-medium text-blue-600">
+                            {enabledCount}
+                        </span>
+                    )}
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-72 p-1">

@@ -3,6 +3,7 @@ import express from "express";
 import type { NextFunction, Request, Response } from "express";
 import cors from "cors";
 import { closePool } from "./lib/db";
+import { ensureSchema } from "./lib/ensureSchema";
 import { chatRouter } from "./routes/chat";
 import { projectsRouter } from "./routes/projects";
 import { projectChatRouter } from "./routes/projectChat";
@@ -13,12 +14,27 @@ import { userRouter } from "./routes/user";
 import { downloadsRouter } from "./routes/downloads";
 import { mcpServersRouter } from "./routes/mcpServers";
 import { mcpOauthRouter } from "./routes/mcpOauth";
+import { authPairRouter } from "./routes/authPair";
+import { searchRouter } from "./routes/search";
+import { integrationsRouter } from "./routes/integrations";
+import { chatSharesRouter } from "./routes/chatShares";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
 
 const ALLOWED_ORIGINS = [
   "http://localhost:3000",
+  // Word add-in dev server (webpack-dev-server with office-addin-dev-certs).
+  // The taskpane is iframed inside Word, but its fetch() calls go from the
+  // taskpane origin (https://localhost:3002) to the backend on :3001 — needs CORS.
+  "https://localhost:3002",
+  "https://127.0.0.1:3002",
+  // Cloud Run exposes the same service under two URL forms:
+  //   - hash-based   : https://mike-frontend-cc6nrgescq-ew.a.run.app
+  //   - project-num  : https://mike-frontend-516192556389.europe-west1.run.app
+  // Both must be allow-listed because the browser uses whichever URL the
+  // user actually loaded as the Origin header.
+  "https://mike-frontend-cc6nrgescq-ew.a.run.app",
   "https://mike-frontend-516192556389.europe-west1.run.app",
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
 ];
@@ -67,6 +83,12 @@ app.use("/users", userRouter);
 app.use("/download", downloadsRouter);
 app.use("/user/mcp-servers", mcpServersRouter);
 app.use("/mcp/oauth", mcpOauthRouter);
+app.use("/auth/pair", authPairRouter);
+app.use("/search", searchRouter);
+app.use("/integrations", integrationsRouter);
+// chatSharesRouter handles both /chat/:id/share* (owner side) and
+// /share/:token* (recipient side), so it must mount at the root.
+app.use("/", chatSharesRouter);
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
@@ -108,7 +130,12 @@ process.on("uncaughtException", (err) => {
 });
 
 const server = app.listen(PORT, () => {
-  console.log(`Mike backend running on port ${PORT}`);
+  console.log(`Max backend running on port ${PORT}`);
+  // Fire-and-forget: any DDL is idempotent, so a slow database does not
+  // need to block the listener from accepting health checks.
+  ensureSchema().catch((err) => {
+    console.error("[ensureSchema] unexpected failure:", err);
+  });
 });
 
 // ── Graceful shutdown (Cloud Run sends SIGTERM) ─────────────

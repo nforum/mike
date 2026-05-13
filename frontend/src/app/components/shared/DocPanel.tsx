@@ -360,7 +360,7 @@ function EditResolveButtons({
                 } = await supabase.auth.getSession();
                 const token = session?.access_token;
                 const apiBase =
-                    process.env.NEXT_PUBLIC_API_BASE_URL ??
+                    process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
                     "http://localhost:3001";
                 const resp = await fetch(
                     `${apiBase}/single-documents/${edit.document_id}/edits/${edit.edit_id}/${verb}`,
@@ -462,7 +462,7 @@ function DownloadButton({
             } = await supabase.auth.getSession();
             const token = session?.access_token;
             const apiBase =
-                process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
+                process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "http://localhost:3001";
             const qs = versionId
                 ? `?version_id=${encodeURIComponent(versionId)}`
                 : "";

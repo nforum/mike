@@ -14,7 +14,10 @@ import {
     uploadStandaloneDocument,
 } from "@/app/lib/mikeApi";
 import { FileDirectory } from "../shared/FileDirectory";
-import { BUILT_IN_WORKFLOWS } from "../workflows/builtinWorkflows";
+import {
+    BUILT_IN_WORKFLOWS,
+    getLocalizedWorkflowTitle,
+} from "../workflows/builtinWorkflows";
 
 interface Props {
     open: boolean;
@@ -42,6 +45,7 @@ export function AddNewTRModal({
     projectCmNumber,
 }: Props) {
     const t = useTranslations("addNewTR");
+    const tBuiltinTitles = useTranslations("builtinWorkflows");
     const isProjectMode = fixedProjectDocs !== undefined;
     const [title, setTitle] = useState("");
     const [underProject, setUnderProject] = useState(false);
@@ -294,7 +298,10 @@ export function AddNewTRModal({
                                             {loadingWorkflows
                                                 ? t("loadingTemplates")
                                                 : selectedWorkflow
-                                                  ? selectedWorkflow.title
+                                                  ? getLocalizedWorkflowTitle(
+                                                        selectedWorkflow,
+                                                        tBuiltinTitles,
+                                                    )
                                                   : t("noTemplate")}
                                         </span>
                                     </div>
@@ -335,7 +342,10 @@ export function AddNewTRModal({
                                                 className={`w-full text-left flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-gray-50 ${selectedWorkflowId === wf.id ? "bg-gray-50 text-gray-900" : "text-gray-700"}`}
                                             >
                                                 <span className="flex-1 truncate">
-                                                    {wf.title}
+                                                    {getLocalizedWorkflowTitle(
+                                                        wf,
+                                                        tBuiltinTitles,
+                                                    )}
                                                 </span>
                                                 {selectedWorkflowId ===
                                                     wf.id && (

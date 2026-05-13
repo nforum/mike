@@ -17,6 +17,7 @@ import {
     closeMcpServers,
     loadEnabledMcpServersForUser,
 } from "../lib/mcp/servers";
+import { loadBuiltinMcpServers } from "../lib/mcp/builtin";
 
 const PROJECT_SYSTEM_PROMPT_EXTRA = `PROJECT CONTEXT:
 You are operating within a project folder that contains a collection of legal documents the user has organised for a single matter. The user's questions will usually refer to one or more documents in this project — your job is to find the relevant files to work on. Use list_documents to see what is available and fetch_documents / read_document to pull in any documents you need before answering.
@@ -33,14 +34,26 @@ projectChatRouter.post("/", requireAuth, async (req, res) => {
     const userId = res.locals.userId as string;
     const userEmail = res.locals.userEmail as string | undefined;
     const { projectId } = req.params;
-    const { messages, chat_id, model, displayed_doc, attached_documents } =
-        req.body as {
-            messages: ChatMessage[];
-            chat_id?: string;
-            model?: string;
-            displayed_doc?: { filename: string; document_id: string };
-            attached_documents?: { filename: string; document_id: string }[];
-        };
+    const {
+        messages,
+        chat_id,
+        model,
+        displayed_doc,
+        attached_documents,
+        client,
+        editMode,
+    } = req.body as {
+        messages: ChatMessage[];
+        chat_id?: string;
+        model?: string;
+        displayed_doc?: { filename: string; document_id: string };
+        attached_documents?: { filename: string; document_id: string }[];
+        // See chat.ts for `client` / `editMode` semantics — same fields,
+        // forwarded so per-project chats from the Word add-in get the
+        // same Office.js-friendly tool-use guidance.
+        client?: "web" | "word";
+        editMode?: "track" | "comments";
+    };
 
     const db = createServerSupabase();
 
@@ -87,7 +100,9 @@ projectChatRouter.post("/", requireAuth, async (req, res) => {
         await db.from("chat_messages").insert({
             chat_id: chatId,
             role: "user",
-            content: lastUser.content,
+            // See chat.ts — jsonb column needs JSON literals; wrap the
+            // user's plain string so pg can parse it as a JSON string.
+            content: JSON.stringify(lastUser.content ?? ""),
             files: lastUser.files ?? null,
             workflow: lastUser.workflow ?? null,
         });
@@ -157,7 +172,13 @@ projectChatRouter.post("/", requireAuth, async (req, res) => {
     const write = (line: string) => res.write(line);
 
     const apiKeys = await getUserApiKeys(userId, db);
-    const mcpServers = await loadEnabledMcpServersForUser(userId, db);
+    // Per-user connectors come first so they win any slug collision in
+    // findMcpServerForTool; built-in (system-side) MCPs follow.
+    const [userMcpServers, builtinMcpServers] = await Promise.all([
+        loadEnabledMcpServersForUser(userId, db),
+        loadBuiltinMcpServers(),
+    ]);
+    const mcpServers = [...userMcpServers, ...builtinMcpServers];
 
     try {
         write(`data: ${JSON.stringify({ type: "chat_id", chatId })}\n\n`);
@@ -175,6 +196,8 @@ projectChatRouter.post("/", requireAuth, async (req, res) => {
             apiKeys,
             projectId,
             mcpServers,
+            client: client ?? "web",
+            editMode: editMode ?? "track",
         });
 
         const annotations = extractAnnotations(fullText, docIndex, events);

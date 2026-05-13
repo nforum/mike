@@ -306,7 +306,7 @@ export default function McpServersPage() {
                     </Button>
                 </div>
                 <p className="text-sm text-gray-500 max-w-2xl">
-                    Connectors plug external tools into Mike via the{" "}
+                    Connectors plug external tools into Max via the{" "}
                     <a
                         href="https://modelcontextprotocol.io"
                         target="_blank"
@@ -335,7 +335,7 @@ export default function McpServersPage() {
                         {t("trustWarning.title")}
                     </p>
                     <p className="text-xs mt-1 leading-relaxed">
-                        A connector&rsquo;s operator can see anything Mike
+                        A connector&rsquo;s operator can see anything Max
                         sends in tool calls &mdash; your prompts, document
                         excerpts, and the tool&rsquo;s own response. Custom
                         headers (including{" "}

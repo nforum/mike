@@ -60,7 +60,18 @@ export default function MikeLayout({
 
     useEffect(() => {
         if (!authLoading && !isAuthenticated) {
-            router.push("/login");
+            // Preserve the deep-link target so the user lands back on
+            // the page they originally requested instead of `/assistant`.
+            // Same-origin whitelist is enforced inside the consumer.
+            let next: string | null = null;
+            if (typeof window !== "undefined") {
+                next = window.location.pathname + window.location.search;
+            }
+            const target =
+                next && next !== "/" && next !== "/login"
+                    ? `/login?next=${encodeURIComponent(next)}`
+                    : "/login";
+            router.push(target);
         }
     }, [authLoading, isAuthenticated, router]);
 

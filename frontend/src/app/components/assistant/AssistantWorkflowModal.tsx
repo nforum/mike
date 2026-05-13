@@ -3,11 +3,15 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, Search, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { MikeWorkflow } from "../shared/types";
 import { listWorkflows } from "@/app/lib/mikeApi";
-import { BUILT_IN_WORKFLOWS } from "../workflows/builtinWorkflows";
+import {
+    BUILT_IN_WORKFLOWS,
+    getLocalizedWorkflowTitle,
+} from "../workflows/builtinWorkflows";
 
 interface Props {
     open: boolean;
@@ -26,11 +30,19 @@ export function AssistantWorkflowModal({
     projectCmNumber,
     initialWorkflowId,
 }: Props) {
+    const t = useTranslations("workflowPicker");
+    const tBuiltinTitles = useTranslations("builtinWorkflows");
     const [workflows, setWorkflows] = useState<MikeWorkflow[]>([]);
     const [loading, setLoading] = useState(false);
     const [selected, setSelected] = useState<MikeWorkflow | null>(null);
     const [search, setSearch] = useState("");
     const [rightVisible, setRightVisible] = useState(false);
+
+    // Resolve a workflow's display title once. Built-in titles come from
+    // i18n via getLocalizedWorkflowTitle; user-created workflows keep
+    // their original `title` field unchanged.
+    const resolveTitle = (wf: MikeWorkflow): string =>
+        getLocalizedWorkflowTitle(wf, tBuiltinTitles);
 
     useEffect(() => {
         if (!selected) {
@@ -78,7 +90,11 @@ export function AssistantWorkflowModal({
     if (!open) return null;
 
     const filteredWorkflows = search
-        ? workflows.filter((w) => w.title.toLowerCase().includes(search.toLowerCase()))
+        ? workflows.filter((w) =>
+              resolveTitle(w)
+                  .toLowerCase()
+                  .includes(search.toLowerCase()),
+          )
         : workflows;
 
     function handleUse() {
@@ -97,7 +113,7 @@ export function AssistantWorkflowModal({
                     <div className="flex items-center gap-1.5 text-xs text-gray-400">
                         {projectName ? (
                             <>
-                                <span>Projects</span>
+                                <span>{t("breadcrumbs.projects")}</span>
                                 <span>›</span>
                                 <span>
                                     {projectName}
@@ -106,15 +122,15 @@ export function AssistantWorkflowModal({
                                         : ""}
                                 </span>
                                 <span>›</span>
-                                <span>Assistant</span>
+                                <span>{t("breadcrumbs.assistant")}</span>
                                 <span>›</span>
-                                <span>Add workflow</span>
+                                <span>{t("breadcrumbs.addWorkflow")}</span>
                             </>
                         ) : (
                             <>
-                                <span>Assistant</span>
+                                <span>{t("breadcrumbs.assistant")}</span>
                                 <span>›</span>
-                                <span>Add workflow</span>
+                                <span>{t("breadcrumbs.addWorkflow")}</span>
                             </>
                         )}
                     </div>
@@ -138,7 +154,7 @@ export function AssistantWorkflowModal({
                                 <Search className="h-3 w-3 text-gray-400 shrink-0" />
                                 <input
                                     type="text"
-                                    placeholder="Search workflows…"
+                                    placeholder={t("searchPlaceholder")}
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     className="flex-1 bg-transparent text-xs text-gray-700 placeholder:text-gray-400 outline-none"
@@ -168,7 +184,9 @@ export function AssistantWorkflowModal({
                             </div>
                         ) : filteredWorkflows.length === 0 ? (
                             <p className="px-4 py-8 text-sm text-center text-gray-400">
-                                {search ? "No matches found" : "No assistant workflows found"}
+                                {search
+                                    ? t("noMatches")
+                                    : t("noAssistantWorkflows")}
                             </p>
                         ) : (
                             filteredWorkflows.map((wf) => (
@@ -187,10 +205,12 @@ export function AssistantWorkflowModal({
                                     }`}
                                 >
                                     <span className="flex-1 truncate text-gray-800">
-                                        {wf.title}
+                                        {resolveTitle(wf)}
                                     </span>
                                     <span className="shrink-0 text-xs text-gray-400">
-                                        {wf.is_system ? "Built-in" : "Custom"}
+                                        {wf.is_system
+                                            ? t("badgeBuiltin")
+                                            : t("badgeCustom")}
                                     </span>
                                 </button>
                             ))
@@ -202,7 +222,7 @@ export function AssistantWorkflowModal({
                         <div className={`flex-1 border-l border-gray-100 flex flex-col overflow-hidden px-3 pb-3 transition-opacity duration-200 ${rightVisible ? "opacity-100" : "opacity-0"}`}>
                             <div className="flex items-center justify-between py-3 shrink-0">
                                 <p className="text-xs font-medium text-gray-700">
-                                    Workflow Prompt
+                                    {t("workflowPrompt")}
                                 </p>
                                 <button
                                     onClick={() => setSelected(null)}
@@ -261,7 +281,7 @@ export function AssistantWorkflowModal({
                                     }}
                                 >
                                     {selected.prompt_md ??
-                                        "_No prompt defined._"}
+                                        `_${t("noPromptDefined")}_`}
                                 </ReactMarkdown>
                             </div>
                         </div>
@@ -275,7 +295,7 @@ export function AssistantWorkflowModal({
                         onClick={onClose}
                         className="rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100 transition-colors"
                     >
-                        Cancel
+                        {t("cancel")}
                     </button>
                     <button
                         type="button"
@@ -283,7 +303,7 @@ export function AssistantWorkflowModal({
                         disabled={!selected}
                         className="rounded-lg bg-gray-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
                     >
-                        Use
+                        {t("use")}
                     </button>
                 </div>
             </div>

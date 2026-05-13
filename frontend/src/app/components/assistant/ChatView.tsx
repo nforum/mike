@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useState, useRef, useEffect } from "react";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, Share2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { UserMessage } from "./UserMessage";
 import { AssistantMessage } from "./AssistantMessage";
 import { ChatInput } from "./ChatInput";
@@ -10,6 +11,7 @@ import {
     type AssistantSidePanelTab,
 } from "./AssistantSidePanel";
 import { AssistantWorkflowModal } from "./AssistantWorkflowModal";
+import { ShareChatModal } from "../shared/ShareChatModal";
 import type {
     MikeCitationAnnotation,
     MikeEditAnnotation,
@@ -23,6 +25,13 @@ interface Props {
     isResponseLoading: boolean;
     handleChat: (message: MikeMessage) => Promise<string | null>;
     cancel: () => void;
+    /**
+     * Optional — present on `/assistant/chat/[id]` but not on the
+     * landing `/assistant` route (no chat exists yet). When set, we
+     * surface a small Share button in the chat header.
+     */
+    chatId?: string;
+    chatTitle?: string | null;
 }
 
 export function ChatView({
@@ -30,7 +39,11 @@ export function ChatView({
     isResponseLoading,
     handleChat,
     cancel,
+    chatId,
+    chatTitle,
 }: Props) {
+    const tShare = useTranslations("shareChat");
+    const [shareOpen, setShareOpen] = useState(false);
     const [tabs, setTabs] = useState<AssistantSidePanelTab[]>([]);
     const [activeTabId, setActiveTabId] = useState<string | null>(null);
     const [panelMounted, setPanelMounted] = useState(false);
@@ -447,6 +460,15 @@ export function ChatView({
         <div className="h-full w-full flex relative">
             {/* Chat column */}
             <div className="flex flex-col h-full flex-1 relative">
+                {chatId && messages.length > 0 && (
+                    <button
+                        onClick={() => setShareOpen(true)}
+                        title={tShare("title")}
+                        className="absolute right-3 top-3 z-10 flex items-center justify-center p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+                    >
+                        <Share2 className="h-4 w-4" />
+                    </button>
+                )}
                 {/* Scrollable messages */}
                 <div
                     ref={messagesContainerRef}
@@ -597,6 +619,14 @@ export function ChatView({
                 onSelect={() => setWorkflowModalOpen(false)}
                 initialWorkflowId={workflowModalInitialId}
             />
+
+            {shareOpen && chatId && (
+                <ShareChatModal
+                    chatId={chatId}
+                    chatTitle={chatTitle ?? null}
+                    onClose={() => setShareOpen(false)}
+                />
+            )}
 
             {panelMounted && (
                 <div

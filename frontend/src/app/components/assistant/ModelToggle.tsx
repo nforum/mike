@@ -46,6 +46,12 @@ interface Props {
         geminiApiKey: string | null;
         openaiApiKey: string | null;
         mistralApiKey: string | null;
+        serverKeys?: {
+            claude?: boolean;
+            gemini?: boolean;
+            openai?: boolean;
+            mistral?: boolean;
+        };
     };
 }
 

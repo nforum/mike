@@ -2,7 +2,7 @@
 
 ## Purpose
 
-A workflow/prompt pack is a file-based way to describe a Mike workflow, its prompt content, and any tabular review columns that guide structured legal review.
+A workflow/prompt pack is a file-based way to describe a Max workflow, its prompt content, and any tabular review columns that guide structured legal review.
 
 This is a proposed declarative format. It does not imply runtime loading, database import, or automatic registration unless and until a workflow importer is added.
 

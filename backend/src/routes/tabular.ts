@@ -1100,7 +1100,7 @@ function buildTabularMessages(
         .map((c, i) => `- COL:${i} "${c.name}"`)
         .join("\n");
 
-    const systemContent = `You are Mike, an AI legal assistant. You are helping with the tabular review titled "${reviewTitle}".
+    const systemContent = `You are Max, an AI legal assistant. You are helping with the tabular review titled "${reviewTitle}".
 
 The review extracts specific fields from multiple legal documents into a structured table.
 You do NOT have the cell content yet — call read_table_cells to fetch the cells you need before answering.
@@ -1255,7 +1255,11 @@ tabularRouter.post("/:reviewId/chat", requireAuth, async (req, res) => {
         await db.from("tabular_review_chat_messages").insert({
             chat_id: chatId,
             role: "user",
-            content: lastUser.content,
+            // `tabular_review_chat_messages.content` is jsonb (migration
+            // 107). Wrap the user's plain string so it's a valid JSON
+            // literal — the assistant insert below already passes an
+            // array which dbShim handles natively.
+            content: JSON.stringify(lastUser.content ?? ""),
         });
     }
 
@@ -1310,13 +1314,15 @@ tabularRouter.post("/:reviewId/chat", requireAuth, async (req, res) => {
 
         // Generate title on first exchange
         if (chatId && isFirstExchange && !chatTitle && lastUser.content) {
-            const { title_model } = await getUserModelSettings(userId, db);
+            const { title_model, preferred_language } =
+                await getUserModelSettings(userId, db);
             const title = await generateChatTitle(
                 title_model,
                 lastUser.content,
                 {
                     reviewTitle: clientReviewTitle ?? review.title ?? null,
                     projectName: clientProjectName ?? null,
+                    language: preferred_language,
                 },
                 apiKeys,
             );
@@ -1458,7 +1464,16 @@ The "summary" field must contain only the extracted value with inline citations 
 async function generateChatTitle(
     model: string,
     firstUserMessage: string,
-    context?: { reviewTitle?: string | null; projectName?: string | null },
+    context?: {
+        reviewTitle?: string | null;
+        projectName?: string | null;
+        /**
+         * UI locale of the user. Title is forced into this language so
+         * the sidebar reads naturally even when the user typed in a
+         * different language.
+         */
+        language?: string;
+    },
     apiKeys?: import("../lib/llm").UserApiKeys,
 ): Promise<string | null> {
     try {
@@ -1470,10 +1485,11 @@ async function generateChatTitle(
         const contextBlock = contextLines.length
             ? `This chat is in the context of a tabular review.\n${contextLines.join("\n")}\n\n`
             : "";
+        const langName = context?.language === "hr" ? "Croatian" : "English";
 
         const raw = await completeText({
             model,
-            user: `${contextBlock}Generate a short title (4-6 words) for a chat that starts with the message below. The title should reflect the user's specific question, not the review or project name. Return only the title, no punctuation, no quotes:\n\n${firstUserMessage}`,
+            user: `${contextBlock}Generate a short title (4-6 words) for a chat that starts with the message below. The title MUST be written in ${langName} (the user's UI language), regardless of the language of the user's message. The title should reflect the user's specific question, not the review or project name. Return only the title, no punctuation, no quotes:\n\n${firstUserMessage}`,
             maxTokens: 64,
             apiKeys,
         });

@@ -17,12 +17,21 @@ import { attachActiveVersionPaths, loadActiveVersion } from "./documentVersions"
 import {
     streamChatWithTools,
     resolveModel,
-    DEFAULT_MAIN_MODEL,
     type LlmMessage,
     type OpenAIToolSchema,
 } from "./llm";
+import { resolveDefaultMainModel } from "./userSettings";
 import { findMcpServerForTool } from "./mcp/servers";
 import type { LoadedMcpServer } from "./mcp/types";
+import {
+    formatSearchResultsForLLM,
+    getAvailableProviders,
+    isAnyProviderConfigured,
+    webSearch,
+    type SearchProvider,
+} from "./search";
+import { listSourceKeys } from "./search/external_sources";
+import { resolveProjectSearchConfig } from "./search/search_config";
 
 const STANDARD_FONT_DATA_URL = (() => {
     try {
@@ -77,7 +86,44 @@ export type ChatMessage = {
 // Constants
 // ---------------------------------------------------------------------------
 
-export const SYSTEM_PROMPT = `You are Mike, an AI legal assistant that helps lawyers and legal professionals analyze documents, answer legal questions, and draft legal documents.
+/**
+ * Derive a user-facing brand label from an MCP server row. Used in the
+ * grounding instruction so the model says "Grounding by Eulex.ai"
+ * instead of leaking internal slugs / tool names.
+ *
+ * Heuristic: take the URL host, strip a leading "mcp.", "api.", "rpc.",
+ * or "connector." subdomain (these are server placement details, not
+ * brand). Title-case the first label so "eulex.ai" → "Eulex.ai".
+ *
+ * Falls back to row.name when the URL parses but yields nothing useful
+ * (e.g. an IP address), and to row.slug as a last resort.
+ */
+export function mcpBrandLabel(row: {
+    url?: string | null;
+    name?: string | null;
+    slug?: string | null;
+}): string {
+    const fromUrl = (() => {
+        try {
+            if (!row.url) return null;
+            const host = new URL(row.url).hostname;
+            if (!host || /^[\d.:]+$/.test(host)) return null; // IP — bail
+            const stripped = host.replace(
+                /^(mcp|api|rpc|connector)\./i,
+                "",
+            );
+            const [first, ...rest] = stripped.split(".");
+            if (!first) return null;
+            const titled = first[0].toUpperCase() + first.slice(1);
+            return [titled, ...rest].join(".");
+        } catch {
+            return null;
+        }
+    })();
+    return fromUrl || row.name || row.slug || "MCP";
+}
+
+export const SYSTEM_PROMPT = `You are Max, an AI legal assistant that helps lawyers and legal professionals analyze documents, answer legal questions, and draft legal documents.
 
 DOCUMENT CITATION INSTRUCTIONS:
 When you reference specific content from a document, place a numbered marker [1], [2], etc. inline in your prose at the point of reference.
@@ -447,6 +493,71 @@ export const TOOLS = [
                     },
                 },
                 required: ["doc_id", "edits"],
+            },
+        },
+    },
+];
+
+/**
+ * Web search tool — only attached to the LLM toolset when at least one
+ * provider env key is configured. The model picks the provider via the
+ * `provider` argument (or omits it for auto-pick by backend).
+ */
+export const WEB_SEARCH_TOOLS = [
+    {
+        type: "function",
+        function: {
+            name: "web_search",
+            description:
+                "Search the live web for facts, news, regulatory updates, court decisions, or any information that might have changed since your training cutoff. Returns ranked results with URL, title, snippet, and a fuller body excerpt suitable for grounding. Always cite the URL when you use a result. Use this whenever the user asks about recent events, current law, ongoing cases, or anything time-sensitive — do not answer from parametric knowledge in those cases.",
+            parameters: {
+                type: "object",
+                properties: {
+                    query: {
+                        type: "string",
+                        description:
+                            "Natural-language search query. Be specific (e.g. include regulation numbers like '2016/679' or acronyms like 'GDPR' when applicable).",
+                    },
+                    provider: {
+                        type: "string",
+                        enum: ["tavily", "exa", "parallel", "you", "auto"],
+                        description:
+                            "Which provider to use. 'tavily' = best general-purpose, AI-optimised summaries. 'exa' = neural/semantic search, best for technical/long-form content. 'parallel' = LLM-objective search. 'you' = unified web+news, best for current events. 'auto' (default) lets the backend pick whichever is configured.",
+                    },
+                    num_results: {
+                        type: "integer",
+                        description:
+                            "How many results to return (1-10). Default 5.",
+                        minimum: 1,
+                        maximum: 10,
+                    },
+                    include_domains: {
+                        type: "array",
+                        items: { type: "string" },
+                        description:
+                            "Optional explicit domain allowlist (e.g. ['eur-lex.europa.eu']). Overrides per-project source allowlist when provided.",
+                    },
+                    exclude_domains: {
+                        type: "array",
+                        items: { type: "string" },
+                        description:
+                            "Optional domain denylist applied on top of the curated default excludes.",
+                    },
+                    recency_days: {
+                        type: "integer",
+                        description:
+                            "Restrict results to those published in the last N days. Use small values (1, 7, 30) for breaking-news queries; omit for evergreen topics.",
+                        minimum: 1,
+                        maximum: 3650,
+                    },
+                    source_keys: {
+                        type: "array",
+                        items: { type: "string" },
+                        description:
+                            "Optional curated source-namespace selectors that resolve to domains via the project's external-sources catalog. Mutually exclusive with `include_domains` (latter wins).",
+                    },
+                },
+                required: ["query"],
             },
         },
     },
@@ -1013,7 +1124,7 @@ export async function runEditDocument(params: {
     const { bytes: editedBytes, changes, errors } = await applyTrackedEdits(
         current.bytes,
         edits,
-        { author: "Mike" },
+        { author: "Max" },
     );
 
     if (changes.length === 0) {
@@ -1556,6 +1667,25 @@ export type McpToolResultEvent = {
 };
 
 /**
+ * Result of one `web_search` tool call — surfaced to the UI so the
+ * client can render a "Sources" panel with clickable links per turn,
+ * separate from the MCP grounding panel. `snippet` is the per-result
+ * `content` field already capped at 500 chars by the providers.
+ */
+export type WebSearchEvent = {
+    type: "web_search_result";
+    provider: SearchProvider;
+    query: string;
+    results: {
+        title: string;
+        url: string;
+        snippet: string;
+        published_date: string | null;
+    }[];
+    error: string | null;
+};
+
+/**
  * Cap previewed args/output to keep `chat_messages.content` from bloating.
  * The model still receives the full untruncated tool output — this only
  * affects what is shown to and persisted for the user.
@@ -1579,6 +1709,14 @@ export async function runToolCalls(
     turnEditState?: TurnEditState,
     projectId?: string | null,
     mcpServers?: LoadedMcpServer[],
+    /**
+     * Optional Word add-in context — attached only to the wire form of
+     * `doc_edited` events (see below). Persisted assistant content
+     * stays client-agnostic so chat history shared with web users
+     * doesn't leak Word-specific fields.
+     */
+    client?: "web" | "word",
+    editMode?: "track" | "comments",
 ): Promise<{
     toolResults: unknown[];
     docsRead: { filename: string; document_id?: string }[];
@@ -1588,6 +1726,7 @@ export async function runToolCalls(
     workflowsApplied: { workflow_id: string; title: string }[];
     docsEdited: DocEditedResult[];
     mcpResults: McpToolResultEvent[];
+    webSearches: WebSearchEvent[];
 }> {
     const toolResults: unknown[] = [];
     const docsRead: { filename: string; document_id?: string }[] = [];
@@ -1601,6 +1740,15 @@ export async function runToolCalls(
     const workflowsApplied: { workflow_id: string; title: string }[] = [];
     const docsEdited: DocEditedResult[] = [];
     const mcpResults: McpToolResultEvent[] = [];
+    const webSearches: WebSearchEvent[] = [];
+
+    // Per-project search configuration is declarative — sourced from
+    // backend/src/lib/search/search_config.json (resolveProjectSearchConfig).
+    // Computed once per runToolCalls invocation since the model may emit
+    // several web_search calls in the same tool batch.
+    const projectSearchConfig = resolveProjectSearchConfig(
+        projectId ?? null,
+    );
 
     for (const tc of toolCalls) {
         let args: Record<string, unknown> = {};
@@ -1909,10 +2057,17 @@ export async function runToolCalls(
                         annotations: result.annotations,
                     };
                     docsEdited.push(payload);
+                    // We attach `client` and `edit_mode` here (and only
+                    // here, on the wire — not in the persisted event so
+                    // history stays client-agnostic) so the Word add-in
+                    // can pick the right Apply primitive without an
+                    // extra round-trip. Web clients ignore them.
                     write(
                         `data: ${JSON.stringify({
                             type: "doc_edited",
                             ...payload,
+                            client: client ?? "web",
+                            edit_mode: editMode ?? "track",
                         })}\n\n`,
                     );
                     toolResults.push({
@@ -2322,6 +2477,98 @@ export async function runToolCalls(
                 tool_call_id: tc.id,
                 content: JSON.stringify(toolResultPayload),
             });
+        } else if (tc.function.name === "web_search") {
+            const query = typeof args.query === "string" ? args.query : "";
+            const rawProvider = args.provider as string | undefined;
+            const provider: SearchProvider | undefined =
+                rawProvider === "tavily" ||
+                rawProvider === "exa" ||
+                rawProvider === "parallel" ||
+                rawProvider === "you"
+                    ? rawProvider
+                    : undefined;
+            const numResults =
+                typeof args.num_results === "number"
+                    ? args.num_results
+                    : undefined;
+            const includeDomains = Array.isArray(args.include_domains)
+                ? (args.include_domains as unknown[]).filter(
+                      (d): d is string => typeof d === "string",
+                  )
+                : undefined;
+            const excludeDomains = Array.isArray(args.exclude_domains)
+                ? (args.exclude_domains as unknown[]).filter(
+                      (d): d is string => typeof d === "string",
+                  )
+                : undefined;
+            const recencyDays =
+                typeof args.recency_days === "number"
+                    ? args.recency_days
+                    : undefined;
+            const sourceKeys = Array.isArray(args.source_keys)
+                ? (args.source_keys as unknown[]).filter(
+                      (k): k is string => typeof k === "string",
+                  )
+                : undefined;
+
+            // Apply project defaults for anything the LLM didn't supply,
+            // while still honoring per-call overrides.
+            const effectiveProvider =
+                provider ??
+                projectSearchConfig.preferred_provider ??
+                undefined;
+            const effectiveNumResults =
+                numResults ?? projectSearchConfig.num_results;
+            const effectiveRecency =
+                recencyDays ??
+                projectSearchConfig.recency_days ??
+                undefined;
+            const effectiveSourceKeys = sourceKeys?.length
+                ? sourceKeys
+                : projectSearchConfig.source_keys;
+
+            // Tell the client a search is starting so the UI can render
+            // a "Searching the web…" affordance immediately, before the
+            // (potentially 30s) provider round-trip finishes.
+            write(
+                `data: ${JSON.stringify({
+                    type: "web_search_started",
+                    query,
+                    provider: effectiveProvider ?? "auto",
+                })}\n\n`,
+            );
+
+            const resp = await webSearch({
+                query,
+                provider: effectiveProvider,
+                num_results: effectiveNumResults,
+                include_domains: includeDomains,
+                exclude_domains: excludeDomains,
+                recency_days: effectiveRecency,
+                source_keys: effectiveSourceKeys,
+                allowed_providers: projectSearchConfig.providers,
+            });
+
+            const event: WebSearchEvent = {
+                type: "web_search_result",
+                provider: resp.provider,
+                query: resp.query,
+                results: resp.results.map((r) => ({
+                    title: r.title,
+                    url: r.url,
+                    snippet: r.content,
+                    published_date: r.published_date ?? null,
+                })),
+                error: resp.error ?? null,
+            };
+            write(`data: ${JSON.stringify(event)}\n\n`);
+            webSearches.push(event);
+
+            toolResults.push({
+                role: "tool",
+                tool_call_id: tc.id,
+                content: formatSearchResultsForLLM(resp),
+            });
         }
     }
 
@@ -2334,6 +2581,7 @@ export async function runToolCalls(
         workflowsApplied,
         docsEdited,
         mcpResults,
+        webSearches,
     };
 }
 
@@ -2420,7 +2668,8 @@ type AssistantEvent =
           annotations: EditAnnotation[];
       }
     | { type: "content"; text: string }
-    | McpToolResultEvent;
+    | McpToolResultEvent
+    | WebSearchEvent;
 
 export async function runLLMStream(params: {
     apiMessages: unknown[];
@@ -2448,12 +2697,35 @@ export async function runLLMStream(params: {
      * wired in or the user has none configured.
      */
     mcpServers?: LoadedMcpServer[];
+    /**
+     * Where this chat originates. The Word add-in renders edit annotations
+     * itself via Office.js (the user's open document is the source of
+     * truth, not the cloud .docx version), so we tighten the model's
+     * `find` strategy when client === "word" — see the addendum below.
+     * Defaults to "web".
+     */
+    client?: "web" | "word";
+    /**
+     * User's chosen application mode for assistant edits. Only meaningful
+     * when `client === "word"`; we feed it into the prompt so `reason`
+     * fields read naturally on the Apply card, and echo it back in the
+     * `doc_edited` SSE event so the client picks the matching primitive
+     * (`applyTrackedChangeWithComment` vs `insertCommentAtRange`).
+     */
+    editMode?: "track" | "comments";
 }): Promise<{ fullText: string; events: AssistantEvent[] }> {
-    const { apiMessages, docStore, docIndex, userId, db, write, extraTools, workflowStore, tabularStore, buildCitations, model, apiKeys, projectId, mcpServers } = params;
+    const { apiMessages, docStore, docIndex, userId, db, write, extraTools, workflowStore, tabularStore, buildCitations, model, apiKeys, projectId, mcpServers, client, editMode } = params;
+    const editModeForClient = editMode ?? "track";
+    const isWordClient = client === "word";
     const mcpTools = (mcpServers ?? []).flatMap((s) => s.tools);
+    // Web search is a server-side capability — we expose the tool only
+    // when at least one provider env key is configured. This keeps the
+    // model from advertising/calling a tool that would always 4xx.
+    const webSearchTools = isAnyProviderConfigured() ? WEB_SEARCH_TOOLS : [];
     const activeTools = [
         ...TOOLS,
         ...WORKFLOW_TOOLS,
+        ...webSearchTools,
         ...(extraTools ?? []),
         ...mcpTools,
     ];
@@ -2461,8 +2733,66 @@ export async function runLLMStream(params: {
     // Extract system prompt; pass remaining turns to the adapter as
     // plain user/assistant messages.
     const rawMsgs = apiMessages as { role: string; content: string | null }[];
-    const systemPrompt =
+    let systemPrompt =
         rawMsgs[0]?.role === "system" ? (rawMsgs[0].content ?? "") : "";
+
+    // When the user has live MCP connectors, force the model to use them
+    // as grounding for any non-trivial factual claim. Without this nudge
+    // models routinely fall back to parametric knowledge — which for legal
+    // / domain work is exactly the failure mode MCP exists to prevent.
+    //
+    // We list the connectors by slug + a one-liner so the model can pick
+    // the right tool family on its own. The instruction is injected per
+    // request (rather than into SYSTEM_PROMPT) so users without MCP don't
+    // pay the prompt-token cost or get told about tools they can't use.
+    if (mcpServers && mcpServers.length > 0) {
+        const lines = mcpServers.map((s) => {
+            const toolNames = s.tools
+                .map((t) => (t as { function?: { name?: string } }).function?.name)
+                .filter((n): n is string => typeof n === "string");
+            const toolList = toolNames.length
+                ? toolNames.slice(0, 6).join(", ") +
+                  (toolNames.length > 6 ? `, … (+${toolNames.length - 6} more)` : "")
+                : "no tools listed";
+            const brand = mcpBrandLabel(s.row);
+            return `- ${s.row.name || s.row.slug} (slug: ${s.row.slug}, brand: ${brand}) — tools: ${toolList}`;
+        });
+        const mcpGroundingPrompt = `\n\n---\nGROUNDING SOURCES — MCP connectors are LIVE for this user.\n\nThe user has connected the following Model Context Protocol servers:\n${lines.join("\n")}\n\nYou MUST use these connectors as the source of truth for any factual claim that could plausibly be looked up there. Concretely:\n\n1. Before stating a fact about the law, a regulation, a case, a contract clause, a counterparty, or any domain-specific data, call the relevant MCP tool first and quote / cite from its response.\n2. If multiple connectors could answer the question, prefer the one whose name or description most closely matches the topic. When unsure, call more than one and reconcile.\n3. If an MCP call fails or returns nothing relevant, say so explicitly to the user — do NOT silently substitute parametric knowledge as if it were grounded.\n4. CITATION FORMAT — when you use MCP output, attribute it with this EXACT phrase: \"Grounding by <brand>\" (e.g. \"Grounding by Eulex.ai\"). The brand for each connector is shown above. Do NOT use phrases like \"Per <slug> MCP\", \"According to MCP\", \"From the EULEX MCP\", or expose raw tool names (e.g. \"search_eu_law\") in user-facing prose — those are internals.\n5. Treat parametric knowledge as a hypothesis to verify against MCP output, never as the final answer when MCP coverage exists.\n\nThis is non-negotiable: MCP IS the grounding layer. If you skip it on a question its connectors cover, the answer is wrong by construction.\n---\n`;
+        systemPrompt += mcpGroundingPrompt;
+    }
+
+    // Web search addendum — only when at least one provider is configured
+    // and so `web_search` is in the active toolset for this turn.
+    if (webSearchTools.length > 0) {
+        const avail = getAvailableProviders();
+        const enabled: SearchProvider[] = (
+            ["tavily", "exa", "parallel", "you"] as const
+        ).filter((p) => avail[p]);
+        const sourceKeysSample = listSourceKeys().slice(0, 8);
+        const sourcesHint = sourceKeysSample.length
+            ? `Curated source-key namespaces you may pass via 'source_keys' include (non-exhaustive): ${sourceKeysSample.join(", ")}.`
+            : "";
+        const webSearchPrompt = `\n\n---\nWEB SEARCH — the \`web_search\` tool is LIVE.\n\nProviders available: ${enabled.join(", ")}. Use web_search for any question whose answer depends on facts that may have changed since your training cutoff: recent court rulings, regulatory amendments, news, market data, dates of force, and so on. Do NOT answer such questions from parametric memory.\n\nGuidelines:\n1. Pick the provider that fits the question — Tavily for general/legal-ish queries, Exa for long-form / technical / academic content, Parallel for objective-driven multi-keyword research, You.com for current events. 'auto' (default) is fine when unsure.\n2. Make the query specific. Include regulation numbers ("2016/679"), legal acronyms ("GDPR", "DORA"), case identifiers, or jurisdiction modifiers when the user implied them.\n3. For breaking-news / "latest" queries, set \`recency_days\` (1, 7, or 30).\n4. Cite each fact you use back to its result URL. Format: "Per [Source name](URL), …" — never use raw indices like "[3]" without the URL behind them.\n5. If the chat is inside a project that has a curated source allowlist, the backend automatically restricts every web_search to those domains; you do not need to repeat them in \`include_domains\`. ${sourcesHint}\n6. If web_search returns no results or an error, say so explicitly — do not silently substitute an unverified answer.\n---\n`;
+        systemPrompt += webSearchPrompt;
+    }
+
+    // Word add-in addendum. The Word client renders one Apply card per
+    // annotation we emit on the `doc_edited` SSE event and applies it
+    // locally with Office.js' `Word.body.search()` + tracked changes —
+    // the user's open .docx is the surface they care about, not the
+    // server-side new version. To make those Apply clicks succeed,
+    // `find` must be reachable by Office.js' search primitive, which has
+    // hard limits Microsoft Q&A spells out: ≤200 chars, single
+    // paragraph, no cross-paragraph regex. Passing `editMode` shapes the
+    // language of `reason` so the Apply card reads naturally for the
+    // user's chosen mode. We KEEP `edit_document` as the only edit tool
+    // (do not invent inline `mike-edit` blocks) — single source of truth
+    // means the same model output is consumed identically by web and
+    // Word, and the server still writes a backup .docx version to GCS.
+    if (isWordClient) {
+        systemPrompt += `\n\n---\nWORD ADD-IN MODE — the user is composing inside Microsoft Word.\n\nThe \`edit_document\` tool stays your only edit primitive. The Word client receives every annotation you produce on the \`doc_edited\` event and renders an "Apply in Word" card per annotation, applied via \`Word.body.search()\` + tracked changes against the user's open .docx. To keep those Apply clicks succeed-rate high:\n\n1. Each \`find\` MUST be unambiguously locatable inside the open Word document via \`Word.body.search()\`. That means:\n   - keep it ≤ 200 characters,\n   - keep it inside a single paragraph (Office.js search does NOT match across paragraph marks),\n   - prefer the shortest snippet that still uniquely identifies the location (often just the words / characters that actually change, not the whole sentence).\n2. Always populate \`context_before\` (~40 chars right before \`find\`) and \`context_after\` (~40 chars right after) so the Apply card shows the surrounding paragraph and the user can audit which spot will be edited. Without these, two identical \`find\` strings in the document collapse onto the same range.\n3. Your edits run against the user's LIVE document state. If you previously read it via \`read_document\`, treat that snapshot as potentially stale — re-read with \`find_in_document\` for any clause whose location is critical (e.g. cross-references that may have shifted from earlier accepted edits in this session).\n4. The user's chosen application mode is "${editModeForClient}". Phrase the \`reason\` field accordingly:\n   - "track" → terse imperative explaining WHY the change is needed (e.g. "Aligns with EU Late Payment Directive 30-day cap").\n   - "comments" → suggestion language so it reads naturally inside a Word comment (e.g. "Suggest replacing 10% with 5% — EU Late Payment Directive caps payment terms at 30 days, not 7.").\n5. Batch related edits in a SINGLE \`edit_document\` call rather than one tool call per change — Microsoft's Office.js guidance is "minimize context.sync() calls"; the client batches all annotations from one tool call into one \`Word.run()\`, so fewer / larger calls means fewer document-layout recalcs for the user.\n6. Do NOT add download links, "I've also written a new version" prose, or any other reference to the server-side .docx copy — the user does not care about it; it's a backup. Speak as if the only output is the Apply cards.\n---\n`;
+    }
+
     console.log(
         "[runLLMStream] system prompt:\n" +
             "─".repeat(80) +
@@ -2547,7 +2877,13 @@ export async function runLLMStream(params: {
         citationsOpenSeen = false;
     };
 
-    const selectedModel = resolveModel(model, DEFAULT_MAIN_MODEL);
+    // When the client doesn't pin a model (the Word add-in deliberately
+    // ships without a picker), derive a sensible default from the user's
+    // configured API keys instead of falling back to the canonical
+    // localllm-main — that one always routes through the OpenAI client
+    // and crashes the stream when no OPENAI_API_KEY / VLLM_BASE_URL is
+    // wired up server-side.
+    const selectedModel = resolveModel(model, resolveDefaultMainModel(apiKeys ?? {}));
 
     await streamChatWithTools({
         model: selectedModel,
@@ -2624,6 +2960,7 @@ export async function runLLMStream(params: {
                 workflowsApplied,
                 docsEdited,
                 mcpResults,
+                webSearches,
             } = await runToolCalls(
                     toolCalls,
                     docStore,
@@ -2636,6 +2973,8 @@ export async function runLLMStream(params: {
                     turnEditState,
                     projectId,
                     mcpServers,
+                    client,
+                    editModeForClient,
                 );
             for (const r of docsRead) {
                 events.push({
@@ -2690,6 +3029,9 @@ export async function runLLMStream(params: {
             }
             for (const r of mcpResults) {
                 events.push(r);
+            }
+            for (const w of webSearches) {
+                events.push(w);
             }
 
             // Index alignment would break if any tool branch skips its

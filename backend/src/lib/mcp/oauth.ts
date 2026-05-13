@@ -18,7 +18,7 @@ import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.
 import type { createServerSupabase } from "../supabase";
 
 const STATE_TTL_SECONDS = 5 * 60; // 5 minutes
-const CLIENT_NAME = "Mike";
+const CLIENT_NAME = "Max";
 const CLIENT_URI = "https://github.com/willchen96/mike";
 
 function backendPublicUrl(): string {

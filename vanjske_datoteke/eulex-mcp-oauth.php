@@ -281,6 +281,20 @@ add_action('init', function () {
 				15 * MINUTE_IN_SECONDS
 			);
 
+			// Fallback cookie — carries mcp_resume token so social-login callbacks
+			// can redirect correctly even when /signin page doesn't forward redirect_to.
+			setcookie(
+				'eulex_mcp_resume',
+				$resume_token,
+				[
+					'expires'  => time() + 15 * MINUTE_IN_SECONDS,
+					'path'     => '/',
+					'secure'   => is_ssl(),
+					'httponly' => true,
+					'samesite' => 'Lax',
+				]
+			);
+
 			$return_url = home_url('/eulex-ai/mcp-oauth/authorize?mcp_resume=' . $resume_token);
 			$signin_url = home_url('/signin/?redirect_to=' . urlencode($return_url));
 			wp_redirect($signin_url);

@@ -851,44 +851,71 @@ documentsRouter.post(
   (req, res) => void handleEditResolution(req, res, "reject"),
 );
 
-async function handleDocumentUpload(
-  req: import("express").Request,
-  res: import("express").Response,
-  userId: string,
-  projectId: string | null,
-  db: ReturnType<typeof createServerSupabase>,
-) {
-  const file = req.file;
-  if (!file) return void res.status(400).json({ detail: "file is required" });
+/**
+ * Lower-level document ingestion. Takes raw bytes + a filename and
+ * walks them through the full pipeline (storage upload, structure
+ * extraction, DOCX→PDF conversion, document_versions row, status flip).
+ *
+ * This is the single source of truth for "putting a file into Max";
+ * the multipart upload route and the integrations import endpoint
+ * (Google Drive / OneDrive / Box) both call into here so any future
+ * pipeline change is picked up by both paths automatically.
+ *
+ * Throws on validation/storage errors. Caller is responsible for
+ * mapping exceptions to HTTP responses.
+ */
+export async function processDocumentBytes(params: {
+  userId: string;
+  projectId: string | null;
+  filename: string;
+  content: Buffer;
+  db: ReturnType<typeof createServerSupabase>;
+  /**
+   * Provenance fields, only set when the file came from an external
+   * file-source connector. NULL for direct multipart uploads.
+   */
+  source?: {
+    provider: "google_drive" | "onedrive" | "box";
+    external_id: string;
+    revision: string | null;
+  };
+}): Promise<Record<string, unknown>> {
+  const { userId, projectId, filename, content, db, source } = params;
 
-  const filename = file.originalname;
   const suffix = filename.includes(".")
     ? filename.split(".").pop()!.toLowerCase()
     : "";
-  if (!ALLOWED_TYPES.has(suffix))
-    return void res
-      .status(400)
-      .json({
-        detail: `Unsupported file type: ${suffix}. Allowed: pdf, docx, doc`,
-      });
+  if (!ALLOWED_TYPES.has(suffix)) {
+    throw new Error(
+      `Unsupported file type: ${suffix}. Allowed: pdf, docx, doc`,
+    );
+  }
 
-  const content = file.buffer;
+  const insertPayload: Record<string, unknown> = {
+    project_id: projectId,
+    user_id: userId,
+    filename,
+    file_type: suffix,
+    size_bytes: content.byteLength,
+    status: "processing",
+  };
+  if (source) {
+    insertPayload.source_provider = source.provider;
+    insertPayload.source_external_id = source.external_id;
+    insertPayload.source_revision = source.revision;
+    insertPayload.source_imported_at = new Date().toISOString();
+  }
+
   const { data: doc, error: insertErr } = await db
     .from("documents")
-    .insert({
-      project_id: projectId,
-      user_id: userId,
-      filename,
-      file_type: suffix,
-      size_bytes: content.byteLength,
-      status: "processing",
-    })
+    .insert(insertPayload)
     .select("*")
     .single();
-  if (insertErr || !doc)
-    return void res
-      .status(500)
-      .json({ detail: "Failed to create document record" });
+  if (insertErr || !doc) {
+    throw new Error(
+      `Failed to create document record: ${insertErr?.message ?? "unknown"}`,
+    );
+  }
 
   try {
     const docId = doc.id as string;
@@ -897,23 +924,15 @@ async function handleDocumentUpload(
       suffix === "pdf"
         ? "application/pdf"
         : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-    await uploadFile(
-      key,
-      content.buffer.slice(
-        content.byteOffset,
-        content.byteOffset + content.byteLength,
-      ) as ArrayBuffer,
-      contentType,
-    );
-
-    const rawBuf = content.buffer.slice(
+    const ab = content.buffer.slice(
       content.byteOffset,
       content.byteOffset + content.byteLength,
     ) as ArrayBuffer;
-    const tree = await extractStructureTree(rawBuf, suffix, filename);
-    const pageCount = suffix === "pdf" ? await countPdfPages(rawBuf) : null;
+    await uploadFile(key, ab, contentType);
 
-    // Convert DOCX/DOC → PDF for display. PDFs are their own rendition.
+    const tree = await extractStructureTree(ab, suffix, filename);
+    const pageCount = suffix === "pdf" ? await countPdfPages(ab) : null;
+
     let pdfStoragePath: string | null = null;
     if (suffix === "docx" || suffix === "doc") {
       try {
@@ -938,9 +957,6 @@ async function handleDocumentUpload(
       pdfStoragePath = key;
     }
 
-    // storage_path / pdf_storage_path live on document_versions now —
-    // create the V1 "upload" row and point documents.current_version_id
-    // at it.
     const { data: versionRow, error: verErr } = await db
       .from("document_versions")
       .insert({
@@ -976,16 +992,42 @@ async function handleDocumentUpload(
       .select("*")
       .eq("id", docId)
       .single();
-    // Surface storage paths to the caller for backward compatibility.
-    const responseDoc = updated
+    return updated
       ? { ...updated, storage_path: key, pdf_storage_path: pdfStoragePath }
-      : updated;
-    return void res.status(201).json(responseDoc);
+      : { id: docId, storage_path: key, pdf_storage_path: pdfStoragePath };
   } catch (e) {
     await db.from("documents").update({ status: "error" }).eq("id", doc.id);
-    return void res
-      .status(500)
-      .json({ detail: `Document processing failed: ${String(e)}` });
+    throw e instanceof Error
+      ? e
+      : new Error(`Document processing failed: ${String(e)}`);
+  }
+}
+
+async function handleDocumentUpload(
+  req: import("express").Request,
+  res: import("express").Response,
+  userId: string,
+  projectId: string | null,
+  db: ReturnType<typeof createServerSupabase>,
+) {
+  const file = req.file;
+  if (!file) return void res.status(400).json({ detail: "file is required" });
+
+  try {
+    const responseDoc = await processDocumentBytes({
+      userId,
+      projectId,
+      filename: file.originalname,
+      content: file.buffer,
+      db,
+    });
+    return void res.status(201).json(responseDoc);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.startsWith("Unsupported file type")) {
+      return void res.status(400).json({ detail: msg });
+    }
+    return void res.status(500).json({ detail: msg });
   }
 }
 

@@ -32,6 +32,94 @@ const REDIRECT_URI =
 const STORAGE_KEY = "mike_oauth_tokens";
 const PKCE_VERIFIER_KEY = "mike_oauth_pkce_verifier";
 const PKCE_STATE_KEY = "mike_oauth_pkce_state";
+const PKCE_EXPIRY_KEY = "mike_oauth_pkce_expiry";
+const NEXT_URL_KEY = "mike_oauth_next_url";
+// PKCE TTL: 15 minutes — matches WordPress transient TTL on eulex.ai
+const PKCE_TTL_MS = 15 * 60 * 1000;
+
+/**
+ * Custom event fired whenever the local token set changes within the
+ * same tab. The browser `storage` event only fires across tabs, so we
+ * dispatch this in addition to localStorage writes to let AuthContext
+ * (and any other in-tab consumers) re-hydrate immediately. Without it,
+ * /auth/callback stores fresh tokens via client-side navigation but
+ * AuthContext keeps its initial unauthenticated state — forcing the
+ * user to click "Sign in" a second time to trigger a hard reload.
+ */
+export const AUTH_TOKEN_EVENT = "mike:auth:tokens-changed";
+
+/**
+ * Read PKCE value from localStorage, clearing if expired.
+ * NOTE: We use localStorage (not sessionStorage) because Safari/WebKit
+ * clears sessionStorage on cross-origin navigation, which breaks the
+ * OAuth round-trip through eulex.ai.
+ */
+function getPkceItem(key: string): string | null {
+    if (typeof window === "undefined") return null;
+    const expiry = localStorage.getItem(PKCE_EXPIRY_KEY);
+    if (expiry && Date.now() > parseInt(expiry, 10)) {
+        // Stale PKCE — clear and force re-login
+        localStorage.removeItem(PKCE_VERIFIER_KEY);
+        localStorage.removeItem(PKCE_STATE_KEY);
+        localStorage.removeItem(PKCE_EXPIRY_KEY);
+        return null;
+    }
+    return localStorage.getItem(key);
+}
+
+function setPkceItem(key: string, value: string): void {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(key, value);
+    // Always refresh expiry on write
+    localStorage.setItem(PKCE_EXPIRY_KEY, String(Date.now() + PKCE_TTL_MS));
+}
+
+function removePkceItems(): void {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(PKCE_VERIFIER_KEY);
+    localStorage.removeItem(PKCE_STATE_KEY);
+    localStorage.removeItem(PKCE_EXPIRY_KEY);
+}
+
+/**
+ * Same-origin path whitelist for post-login deep linking.
+ *
+ * Anything that doesn't start with a single "/" (and isn't a protocol
+ * like "//evil.com/...") is rejected so the URL parameter can't be
+ * used as an open redirect. Returns the safe path, or null if not safe.
+ */
+function sanitizeNextPath(raw: string | null | undefined): string | null {
+    if (!raw) return null;
+    if (typeof raw !== "string") return null;
+    // Must start with "/" but not "//" or "/\".
+    if (!raw.startsWith("/")) return null;
+    if (raw.startsWith("//") || raw.startsWith("/\\")) return null;
+    // Cap length defensively.
+    if (raw.length > 2048) return null;
+    return raw;
+}
+
+/**
+ * Remember where to send the user after successful auth (deep links
+ * like /share/<token>). Persisted in localStorage because the OAuth
+ * round-trip is cross-origin and sessionStorage gets blown away by
+ * Safari ITP.
+ */
+export function stashPostLoginRedirect(raw: string | null | undefined): void {
+    if (typeof window === "undefined") return;
+    const safe = sanitizeNextPath(raw);
+    if (safe) {
+        localStorage.setItem(NEXT_URL_KEY, safe);
+    }
+}
+
+/** Consume + clear the stashed redirect. Returns null if none / unsafe. */
+export function consumePostLoginRedirect(): string | null {
+    if (typeof window === "undefined") return null;
+    const raw = localStorage.getItem(NEXT_URL_KEY);
+    localStorage.removeItem(NEXT_URL_KEY);
+    return sanitizeNextPath(raw);
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,7 +136,14 @@ export interface TokenSet {
 }
 
 export interface OAuthUser {
-    /** WordPress user_id (from JWT sub) */
+    /**
+     * Stable internal users.id UUID (matches chats.user_id,
+     * documents.user_id, tabular_reviews.user_id, …). Initially seeded
+     * from the JWT `sub` (= WordPress user_id) on decode, then
+     * overwritten with the DB UUID by AuthContext via /user/profile.
+     * Comparisons against entity.user_id columns rely on this value
+     * being the UUID, not the WP integer.
+     */
     id: string;
     email: string;
     name: string;
@@ -108,9 +203,9 @@ export async function startAuthorizationFlow(
     const challenge = await generateCodeChallenge(verifier);
     const state = generateState();
 
-    // Persist for the callback
-    sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
-    sessionStorage.setItem(PKCE_STATE_KEY, state);
+    // Persist for the callback (localStorage survives cross-origin redirects on all browsers)
+    setPkceItem(PKCE_VERIFIER_KEY, verifier);
+    setPkceItem(PKCE_STATE_KEY, state);
 
     const params = new URLSearchParams({
         response_type: "code",
@@ -134,12 +229,12 @@ export async function exchangeCodeForTokens(
     state: string,
 ): Promise<TokenSet> {
     // Verify state matches
-    const storedState = sessionStorage.getItem(PKCE_STATE_KEY);
+    const storedState = getPkceItem(PKCE_STATE_KEY);
     if (!storedState || storedState !== state) {
         throw new Error("State mismatch — possible CSRF attack");
     }
 
-    const verifier = sessionStorage.getItem(PKCE_VERIFIER_KEY);
+    const verifier = getPkceItem(PKCE_VERIFIER_KEY);
     if (!verifier) {
         throw new Error("Missing PKCE verifier — flow was interrupted");
     }
@@ -166,8 +261,7 @@ export async function exchangeCodeForTokens(
     const data = await response.json();
 
     // Clean up PKCE state
-    sessionStorage.removeItem(PKCE_VERIFIER_KEY);
-    sessionStorage.removeItem(PKCE_STATE_KEY);
+    removePkceItems();
 
     const tokenSet: TokenSet = {
         access_token: data.access_token,
@@ -243,13 +337,15 @@ export function getStoredTokens(): TokenSet | null {
 export function storeTokens(tokens: TokenSet): void {
     if (typeof window === "undefined") return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(tokens));
+    // Same-tab notification — see AUTH_TOKEN_EVENT comment.
+    window.dispatchEvent(new CustomEvent(AUTH_TOKEN_EVENT));
 }
 
 export function clearTokens(): void {
     if (typeof window === "undefined") return;
     localStorage.removeItem(STORAGE_KEY);
-    sessionStorage.removeItem(PKCE_VERIFIER_KEY);
-    sessionStorage.removeItem(PKCE_STATE_KEY);
+    removePkceItems();
+    window.dispatchEvent(new CustomEvent(AUTH_TOKEN_EVENT));
 }
 
 // ---------------------------------------------------------------------------

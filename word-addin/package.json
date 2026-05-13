@@ -1,0 +1,48 @@
+{
+    "name": "mike-word-addin",
+    "version": "1.0.0",
+    "license": "AGPL-3.0-only",
+    "private": true,
+    "scripts": {
+        "dev": "webpack serve --mode development",
+        "start": "office-addin-debugging start manifest.xml",
+        "stop": "office-addin-debugging stop manifest.xml",
+        "build": "webpack --mode production",
+        "build:dev": "webpack --mode development",
+        "install-certs": "office-addin-dev-certs install",
+        "uninstall-certs": "office-addin-dev-certs uninstall"
+    },
+    "dependencies": {
+        "@tailwindcss/typography": "^0.5.19",
+        "lucide-react": "^0.475.0",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+        "react-markdown": "^9.0.1",
+        "remark-gfm": "^4.0.1"
+    },
+    "devDependencies": {
+        "@babel/core": "^7.25.7",
+        "@babel/preset-env": "^7.25.7",
+        "@babel/preset-react": "^7.25.7",
+        "@babel/preset-typescript": "^7.25.7",
+        "@types/office-js": "^1.0.404",
+        "@types/react": "^18.3.11",
+        "@types/react-dom": "^18.3.1",
+        "autoprefixer": "^10.4.20",
+        "babel-loader": "^9.2.1",
+        "copy-webpack-plugin": "^14.0.0",
+        "css-loader": "^7.1.2",
+        "dotenv-webpack": "^8.1.0",
+        "html-webpack-plugin": "^5.6.3",
+        "office-addin-debugging": "^6.0.7",
+        "office-addin-dev-certs": "^1.12.0",
+        "postcss": "^8.4.47",
+        "postcss-loader": "^8.1.1",
+        "style-loader": "^4.0.0",
+        "tailwindcss": "^3.4.13",
+        "typescript": "^5.6.3",
+        "webpack": "^5.95.0",
+        "webpack-cli": "^5.1.4",
+        "webpack-dev-server": "^5.1.0"
+    }
+}

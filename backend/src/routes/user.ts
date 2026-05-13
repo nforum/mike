@@ -8,9 +8,31 @@ export const userRouter = Router();
 
 const API_KEY_FIELDS = ["claude_api_key", "gemini_api_key", "openai_api_key", "mistral_api_key"] as const;
 
+/**
+ * Per-provider "is a server-side fallback key available?" map. Mirrors
+ * the env-var fallback order used by `userSettings.ts` so the frontend
+ * can show the user "we'll use a shared key — you don't need to enter
+ * your own" affordance without ever leaking the key value itself.
+ */
+function serverKeyAvailability() {
+    return {
+        claude: !!(
+            process.env.ANTHROPIC_API_KEY?.trim() ||
+            process.env.CLAUDE_API_KEY?.trim()
+        ),
+        gemini: !!process.env.GEMINI_API_KEY?.trim(),
+        openai: !!(
+            process.env.OPENAI_API_KEY?.trim() ||
+            process.env.VLLM_API_KEY?.trim()
+        ),
+        mistral: !!process.env.MISTRAL_API_KEY?.trim(),
+    };
+}
+
 // GET /user/profile
 userRouter.get("/profile", requireAuth, async (_req, res) => {
   const userId = res.locals.userId as string;
+  const userEmail = res.locals.userEmail as string | undefined;
   const { data, error } = await from("user_profiles")
     .select("*")
     .eq("user_id", userId)
@@ -19,24 +41,48 @@ userRouter.get("/profile", requireAuth, async (_req, res) => {
   if (error || !data) {
     // Return default profile if none exists
     return res.json({
+      // Internal users.id (UUID). Surfaced explicitly so the web client
+      // can compare against entity.user_id columns (chats.user_id,
+      // documents.user_id, …) which all store this UUID — not the
+      // WordPress user_id stored as the JWT `sub`. Without this the
+      // frontend's owner-check pre-conditions silently mismatch on
+      // every owned-resource action (rename/delete) and the user gets
+      // a misleading "owner-only action" modal.
+      id: userId,
+      email: userEmail ?? null,
       display_name: null,
       organisation: null,
       message_credits_used: 0,
       credits_reset_date: new Date(Date.now() + 30 * 86400000).toISOString(),
       tier: "Free",
       tabular_model: "gemini-3-flash-preview",
+      // Match frontend/src/i18n/request.ts default so a freshly-paired
+      // Word add-in opens in the same language as a freshly-loaded web app.
+      preferred_language: "hr",
       claude_api_key: null,
       gemini_api_key: null,
       openai_api_key: null,
       mistral_api_key: null,
+      server_keys: serverKeyAvailability(),
     });
   }
 
   // Mask API keys — never send full keys to the browser
-  const safe = { ...data };
+  const safe: Record<string, unknown> = { ...data };
   for (const field of API_KEY_FIELDS) {
     safe[field] = maskApiKey(data[field]);
   }
+  // Always overlay the authenticated user's internal id + email so
+  // the client never has to guess the format. user_profiles.user_id
+  // already stores the same value, but keeping this explicit makes
+  // the contract obvious to callers.
+  safe.id = userId;
+  if (userEmail && safe.email == null) safe.email = userEmail;
+  // Boolean flags only — never the env-var values themselves. This is
+  // what the Settings UI keys off to skip "please paste your key" for
+  // providers the operator has wired up centrally (e.g. via Secret
+  // Manager → BREVO_API_KEY style mounts).
+  safe.server_keys = serverKeyAvailability();
   res.json(safe);
 });
 
@@ -47,7 +93,10 @@ userRouter.patch("/profile", requireAuth, async (req, res) => {
     "display_name", "organisation", "tabular_model",
     "claude_api_key", "gemini_api_key", "openai_api_key", "mistral_api_key",
     "message_credits_used", "credits_reset_date",
+    // Locale code (e.g. "en", "hr"). Validated below before persisting.
+    "preferred_language",
   ];
+  const SUPPORTED_LOCALES = new Set(["en", "hr"]);
   const updates: Record<string, any> = { updated_at: new Date().toISOString() };
   for (const key of allowed) {
     if (key in req.body) {
@@ -57,6 +106,12 @@ userRouter.patch("/profile", requireAuth, async (req, res) => {
         // Don't re-encrypt if the value is masked (user didn't change it)
         if (val.includes("•")) continue;
         val = encryptApiKey(val.trim());
+      }
+      // Drop unknown locales silently — clients should never send them
+      // but a typo shouldn't poison the column with a value we can't
+      // load messages for.
+      if (key === "preferred_language") {
+        if (typeof val !== "string" || !SUPPORTED_LOCALES.has(val)) continue;
       }
       updates[key] = val;
     }

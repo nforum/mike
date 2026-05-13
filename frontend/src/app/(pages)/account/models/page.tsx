@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Check, ChevronDown, Eye, EyeOff } from "lucide-react";
+import {
+    AlertCircle,
+    Check,
+    ChevronDown,
+    Eye,
+    EyeOff,
+    Sparkles,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +57,7 @@ export default function ModelsAndApiKeysPage() {
                                 geminiApiKey: profile?.geminiApiKey ?? null,
                                 openaiApiKey: profile?.openaiApiKey ?? null,
                                 mistralApiKey: profile?.mistralApiKey ?? null,
+                                serverKeys: profile?.serverKeys,
                             }}
                             onChange={(id) =>
                                 updateModelPreference("tabularModel", id)
@@ -80,6 +88,7 @@ export default function ModelsAndApiKeysPage() {
                         label={t("apiKeys.anthropic")}
                         placeholder="sk-ant-…"
                         initialValue={profile?.claudeApiKey ?? ""}
+                        serverProvided={!!profile?.serverKeys?.claude}
                         onSave={(value) =>
                             updateApiKey("claude", value.trim() || null)
                         }
@@ -88,6 +97,7 @@ export default function ModelsAndApiKeysPage() {
                         label={t("apiKeys.google")}
                         placeholder="AI…"
                         initialValue={profile?.geminiApiKey ?? ""}
+                        serverProvided={!!profile?.serverKeys?.gemini}
                         onSave={(value) =>
                             updateApiKey("gemini", value.trim() || null)
                         }
@@ -96,6 +106,7 @@ export default function ModelsAndApiKeysPage() {
                         label={t("apiKeys.openai")}
                         placeholder="sk-…"
                         initialValue={profile?.openaiApiKey ?? ""}
+                        serverProvided={!!profile?.serverKeys?.openai}
                         onSave={(value) =>
                             updateApiKey("openai", value.trim() || null)
                         }
@@ -104,6 +115,7 @@ export default function ModelsAndApiKeysPage() {
                         label={t("apiKeys.mistral")}
                         placeholder="sk-…"
                         initialValue={profile?.mistralApiKey ?? ""}
+                        serverProvided={!!profile?.serverKeys?.mistral}
                         onSave={(value) =>
                             updateApiKey("mistral", value.trim() || null)
                         }
@@ -121,7 +133,18 @@ function TabularModelDropdown({
 }: {
     value: string;
     onChange: (id: string) => void;
-    apiKeys: { claudeApiKey: string | null; geminiApiKey: string | null; openaiApiKey: string | null; mistralApiKey: string | null };
+    apiKeys: {
+        claudeApiKey: string | null;
+        geminiApiKey: string | null;
+        openaiApiKey: string | null;
+        mistralApiKey: string | null;
+        serverKeys?: {
+            claude?: boolean;
+            gemini?: boolean;
+            openai?: boolean;
+            mistral?: boolean;
+        };
+    };
 }) {
     const t = useTranslations("models");
     const [isOpen, setIsOpen] = useState(false);
@@ -205,11 +228,19 @@ function ApiKeyField({
     label,
     placeholder,
     initialValue,
+    serverProvided = false,
     onSave,
 }: {
     label: string;
     placeholder: string;
     initialValue: string;
+    /**
+     * Backend reports a server-level fallback key is wired up for this
+     * provider (e.g. via Cloud Secret Manager → ANTHROPIC_API_KEY). When
+     * the user hasn't pasted their own key, we tell them "Max will use
+     * the shared key" instead of leaving the field looking empty + sad.
+     */
+    serverProvided?: boolean;
     onSave: (value: string) => Promise<boolean>;
 }) {
     const t = useTranslations("models");
@@ -224,6 +255,10 @@ function ApiKeyField({
     }, [initialValue]);
 
     const dirty = value !== initialValue;
+    const usingSharedKey = serverProvided && !initialValue;
+    const effectivePlaceholder = usingSharedKey
+        ? t("apiKeys.sharedKeyPlaceholder")
+        : placeholder;
 
     const handleSave = async () => {
         setIsSaving(true);
@@ -239,14 +274,22 @@ function ApiKeyField({
 
     return (
         <div>
-            <label className="text-sm text-gray-600 block mb-2">{label}</label>
+            <div className="flex items-center gap-2 mb-2">
+                <label className="text-sm text-gray-600">{label}</label>
+                {usingSharedKey && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] px-2 py-0.5">
+                        <Sparkles className="h-3 w-3" />
+                        {t("apiKeys.sharedKeyBadge")}
+                    </span>
+                )}
+            </div>
             <div className="flex gap-2">
                 <div className="relative flex-1">
                     <Input
                         type={reveal ? "text" : "password"}
                         value={value}
                         onChange={(e) => setValue(e.target.value)}
-                        placeholder={placeholder}
+                        placeholder={effectivePlaceholder}
                         className="pr-10"
                         autoComplete="off"
                         spellCheck={false}
@@ -281,6 +324,11 @@ function ApiKeyField({
                     )}
                 </Button>
             </div>
+            {usingSharedKey && (
+                <p className="mt-1 text-xs text-gray-400">
+                    {t("apiKeys.sharedKeyHint")}
+                </p>
+            )}
         </div>
     );
 }

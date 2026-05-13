@@ -16,6 +16,7 @@ import type { TabularReview, MikeProject } from "@/app/components/shared/types";
 import { ToolbarTabs } from "@/app/components/shared/ToolbarTabs";
 import { AddNewTRModal } from "@/app/components/tabular/AddNewTRModal";
 import { OwnerOnlyModal } from "@/app/components/shared/OwnerOnlyModal";
+import { useConfirmDialog } from "@/app/components/modals/confirm-dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslations } from "next-intl";
 
@@ -35,6 +36,9 @@ function formatDate(iso: string) {
 export default function TabularReviewsPage() {
     const t = useTranslations("tabularReviewsPage");
     const tCommon = useTranslations("common");
+    const tDelete = useTranslations("confirmDelete");
+    const { confirm: confirmDialog, dialog: confirmDialogEl } =
+        useConfirmDialog();
     
     const tabs: { id: Tab; label: string }[] = [
         { id: "all", label: t("tabs.all") },
@@ -179,6 +183,15 @@ export default function TabularReviewsPage() {
             return !r || !user?.id || r.user_id === user.id;
         });
         const blocked = ids.length - owned.length;
+        if (owned.length > 0) {
+            const ok = await confirmDialog({
+                title: tDelete("reviewsTitle"),
+                message: tDelete("reviewsBody", { count: owned.length }),
+                confirmLabel: tDelete("deleteAction"),
+                destructive: true,
+            });
+            if (!ok) return;
+        }
         setSelectedIds([]);
         await Promise.all(
             owned.map((id) => deleteTabularReview(id).catch(() => {})),
@@ -504,6 +517,21 @@ export default function TabularReviewsPage() {
                                                     );
                                                     return;
                                                 }
+                                                const trimmed =
+                                                    review.title?.trim();
+                                                const ok = await confirmDialog({
+                                                    title: tDelete("reviewTitle"),
+                                                    message: trimmed
+                                                        ? tDelete(
+                                                              "reviewBodyNamed",
+                                                              { title: trimmed },
+                                                          )
+                                                        : tDelete("reviewBody"),
+                                                    confirmLabel:
+                                                        tDelete("deleteAction"),
+                                                    destructive: true,
+                                                });
+                                                if (!ok) return;
                                                 await deleteTabularReview(
                                                     review.id,
                                                 );
@@ -536,6 +564,8 @@ export default function TabularReviewsPage() {
                 action={ownerOnlyAction ?? undefined}
                 onClose={() => setOwnerOnlyAction(null)}
             />
+
+            {confirmDialogEl}
         </div>
     );
 }

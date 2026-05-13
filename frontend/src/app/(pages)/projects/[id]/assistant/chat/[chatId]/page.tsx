@@ -16,6 +16,7 @@ import {
     FileText,
     Loader2,
     Plus,
+    Share2,
     Trash2,
     Upload,
     X,
@@ -41,6 +42,9 @@ import type { ChatInputHandle } from "@/app/components/assistant/ChatInput";
 import { ProjectExplorer } from "@/app/components/projects/ProjectExplorer";
 import { DocView } from "@/app/components/shared/DocView";
 import { OwnerOnlyModal } from "@/app/components/shared/OwnerOnlyModal";
+import { ShareChatModal } from "@/app/components/shared/ShareChatModal";
+import { useConfirmDialog } from "@/app/components/modals/confirm-dialog";
+import { useTranslations } from "next-intl";
 import { DocxView } from "@/app/components/shared/DocxView";
 import { MikeIcon } from "@/components/chat/mike-icon";
 import { useAuth } from "@/contexts/AuthContext";
@@ -202,6 +206,10 @@ export default function ProjectAssistantChatPage({ params }: Props) {
     const { setSidebarOpen } = useSidebar();
     const { user } = useAuth();
     const { profile } = useUserProfile();
+    const tDelete = useTranslations("confirmDelete");
+    const tShare = useTranslations("shareChat");
+    const { confirm: confirmDialog, dialog: confirmDialogEl } =
+        useConfirmDialog();
     const username =
         profile?.displayName?.trim() || user?.email?.split("@")[0] || "there";
 
@@ -212,6 +220,7 @@ export default function ProjectAssistantChatPage({ params }: Props) {
     const [chatLoaded, setChatLoaded] = useState(false);
     const [creatingChat, setCreatingChat] = useState(false);
     const [deletingChat, setDeletingChat] = useState(false);
+    const [shareOpen, setShareOpen] = useState(false);
 
     // Panel widths
     const [explorerWidth, setExplorerWidth] = useState(EXPLORER_DEFAULT);
@@ -257,7 +266,7 @@ export default function ProjectAssistantChatPage({ params }: Props) {
     const { messages, isResponseLoading, handleChat, setMessages, cancel } =
         useAssistantChat({ initialMessages, chatId, projectId });
 
-    const hasLoaded = useRef(false);
+    const loadedChatId = useRef<string | null>(null);
     const hasAutoSent = useRef(false);
     const hasInitialScrolled = useRef(false);
 
@@ -327,8 +336,8 @@ export default function ProjectAssistantChatPage({ params }: Props) {
     }, [chatId, setCurrentChatId]);
 
     useEffect(() => {
-        if (hasLoaded.current) return;
-        hasLoaded.current = true;
+        if (loadedChatId.current === chatId) return;
+        loadedChatId.current = chatId;
         getChat(chatId)
             .then(({ chat, messages: loaded }) => {
                 setChatTitle(chat.title);
@@ -581,6 +590,16 @@ export default function ProjectAssistantChatPage({ params }: Props) {
             setOwnerOnlyAction("delete this chat");
             return;
         }
+        const trimmedTitle = chatTitle?.trim();
+        const ok = await confirmDialog({
+            title: tDelete("chatTitle"),
+            message: trimmedTitle
+                ? tDelete("chatBodyNamed", { title: trimmedTitle })
+                : tDelete("chatBody"),
+            confirmLabel: tDelete("deleteAction"),
+            destructive: true,
+        });
+        if (!ok) return;
         setDeletingChat(true);
         try {
             await deleteChat(chatId);
@@ -797,6 +816,13 @@ export default function ProjectAssistantChatPage({ params }: Props) {
                     )}
                 </div>
                 <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setShareOpen(true)}
+                        title={tShare("title")}
+                        className="flex items-center justify-center p-1.5 text-gray-500 hover:text-gray-900 transition-colors"
+                    >
+                        <Share2 className="h-4 w-4" />
+                    </button>
                     <button
                         onClick={handleNewChat}
                         disabled={creatingChat}
@@ -1233,6 +1259,14 @@ export default function ProjectAssistantChatPage({ params }: Props) {
                 action={ownerOnlyAction ?? undefined}
                 onClose={() => setOwnerOnlyAction(null)}
             />
+            {shareOpen && (
+                <ShareChatModal
+                    chatId={chatId}
+                    chatTitle={chatTitle}
+                    onClose={() => setShareOpen(false)}
+                />
+            )}
+            {confirmDialogEl}
         </div>
     );
 }

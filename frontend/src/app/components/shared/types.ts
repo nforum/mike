@@ -1,4 +1,4 @@
-// Shared TypeScript types for Mike AI legal assistant
+// Shared TypeScript types for Max AI legal assistant
 
 export interface MikeFolder {
   id: string;

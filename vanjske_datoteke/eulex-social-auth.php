@@ -49,6 +49,32 @@ if (!defined('EULEX_TERMS_VERSION')) {
 	define('EULEX_TERMS_VERSION', '2025-01-01');
 }
 
+// Max app domains allowed as redirect targets after social login.
+// Preferred override: set EULEX_SOCIAL_ALLOWED_REDIRECT_HOSTS in wp-config.php
+// so deploys don't require re-uploading this plugin file. Format: comma-separated
+// hosts, NO scheme (https://) and NO trailing slash. Examples:
+//   'mike-frontend-516192556389.europe-west1.run.app,mike.eulex.ai,localhost'
+if (!defined('EULEX_SOCIAL_ALLOWED_REDIRECT_HOSTS')) {
+	define(
+		'EULEX_SOCIAL_ALLOWED_REDIRECT_HOSTS',
+		implode(',', [
+			'mike-frontend-516192556389.europe-west1.run.app', // production Cloud Run
+			// 'mike.eulex.ai',                                // custom domain (uncomment when wired)
+			// 'mike-frontend-stage.example.run.app',          // staging (uncomment if used)
+			'localhost',                                        // local dev (any port)
+		])
+	);
+}
+
+add_filter('allowed_redirect_hosts', function (array $hosts): array {
+	$extra = array_filter(array_map('trim', explode(',', EULEX_SOCIAL_ALLOWED_REDIRECT_HOSTS)));
+	foreach ($extra as $host) {
+		$hosts[] = $host;
+	}
+	return $hosts;
+});
+
+
 /**
  * =============================================================================
  * SHARED HELPERS
@@ -645,9 +671,28 @@ add_action('init', function () {
 			exit;
 		}
 
+		$default_redirect = home_url(EULEX_GOOGLE_DEFAULT_REDIRECT);
 		$redirect_to = !empty($stored['redirect_to'])
-			? wp_validate_redirect($stored['redirect_to'], home_url(EULEX_GOOGLE_DEFAULT_REDIRECT))
-			: home_url(EULEX_GOOGLE_DEFAULT_REDIRECT);
+			? wp_validate_redirect($stored['redirect_to'], $default_redirect)
+			: $default_redirect;
+
+		// Fallback: if redirect_to resolved to the default (stored value was missing or
+		// blocked), check for the mcp_resume cookie set by eulex-mcp-oauth.php.
+		// This handles the common case where the /signin page Google button doesn't
+		// forward the redirect_to parameter, causing the mcp_resume URL to be lost.
+		if ($redirect_to === $default_redirect && !empty($_COOKIE['eulex_mcp_resume'])) {
+			$cookie_token  = sanitize_text_field(wp_unslash($_COOKIE['eulex_mcp_resume']));
+			$resume_url    = home_url('/eulex-ai/mcp-oauth/authorize?mcp_resume=' . $cookie_token);
+			$redirect_to   = $resume_url;
+			// Clear the cookie — single use.
+			setcookie('eulex_mcp_resume', '', [
+				'expires'  => time() - 3600,
+				'path'     => '/',
+				'secure'   => is_ssl(),
+				'httponly' => true,
+				'samesite' => 'Lax',
+			]);
+		}
 
 		eulex_social_login_user((int) $user_id, $redirect_to);
 	}
@@ -754,9 +799,24 @@ add_action('init', function () {
 			exit;
 		}
 
+		$default_redirect = home_url(EULEX_LINKEDIN_DEFAULT_REDIRECT);
 		$redirect_to = !empty($stored['redirect_to'])
-			? wp_validate_redirect($stored['redirect_to'], home_url(EULEX_LINKEDIN_DEFAULT_REDIRECT))
-			: home_url(EULEX_LINKEDIN_DEFAULT_REDIRECT);
+			? wp_validate_redirect($stored['redirect_to'], $default_redirect)
+			: $default_redirect;
+
+		// Fallback: same mcp_resume cookie strategy as Google callback above.
+		if ($redirect_to === $default_redirect && !empty($_COOKIE['eulex_mcp_resume'])) {
+			$cookie_token  = sanitize_text_field(wp_unslash($_COOKIE['eulex_mcp_resume']));
+			$resume_url    = home_url('/eulex-ai/mcp-oauth/authorize?mcp_resume=' . $cookie_token);
+			$redirect_to   = $resume_url;
+			setcookie('eulex_mcp_resume', '', [
+				'expires'  => time() - 3600,
+				'path'     => '/',
+				'secure'   => is_ssl(),
+				'httponly' => true,
+				'samesite' => 'Lax',
+			]);
+		}
 
 		eulex_social_login_user((int) $user_id, $redirect_to);
 	}

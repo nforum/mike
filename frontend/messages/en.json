@@ -15,7 +15,9 @@
     "search": "Search",
     "name": "Name",
     "email": "Email",
-    "rename": "Rename"
+    "rename": "Rename",
+    "copy": "Copy",
+    "copied": "Copied"
   },
   "sidebar": {
     "assistant": "Assistant",
@@ -58,7 +60,9 @@
     "tabs": {
       "general": "General",
       "models": "Models & API Keys",
-      "connectors": "Connectors"
+      "connectors": "Connectors",
+      "fileSources": "File sources",
+      "wordAddin": "Word Add-in"
     },
     "profile": {
       "title": "Profile",
@@ -96,24 +100,27 @@
     "selectModel": "Select a model",
     "apiKeys": {
       "title": "API Keys",
-      "description": "You must provide your own API keys for the app to work or add your API keys into the .env file if you are running your own instance of Mike.",
+      "description": "You must provide your own API keys for the app to work or add your API keys into the .env file if you are running your own instance of Max.",
       "titleGenNote": "Title generation automatically routes to the cheapest model of whichever provider you've configured (LocalLLM Lite if available, otherwise Gemini Flash Lite, otherwise Claude Haiku).",
       "anthropic": "Anthropic (Claude) API Key",
       "google": "Google (Gemini) API Key",
       "openai": "OpenAI API Key",
       "mistral": "Mistral AI API Key",
       "addKeyTooltip": "Add a {provider} API key to use this model",
-      "failedSave": "Failed to save {label}."
+      "failedSave": "Failed to save {label}.",
+      "sharedKeyBadge": "Shared key available",
+      "sharedKeyPlaceholder": "Using shared key — paste your own to override",
+      "sharedKeyHint": "Max will use a shared key configured by the administrator. You only need to paste your own if you want to use a separate account."
     }
   },
   "connectors": {
     "title": "Connectors",
     "hideForm": "Hide form",
     "addConnector": "Add connector",
-    "description": "Connectors plug external tools into Mike via the Model Context Protocol (MCP) — legal-data sources, web research, internal company APIs, and so on. Tools discovered from each connector become available to the chat assistant.",
+    "description": "Connectors plug external tools into Max via the Model Context Protocol (MCP) — legal-data sources, web research, internal company APIs, and so on. Tools discovered from each connector become available to the chat assistant.",
     "trustWarning": {
       "title": "Only add connectors you trust",
-      "description": "A connector's operator can see anything Mike sends in tool calls — your prompts, document excerpts, and the tool's own response. Custom headers (including Authorization tokens) are sent on every request."
+      "description": "A connector's operator can see anything Max sends in tool calls — your prompts, document excerpts, and the tool's own response. Custom headers (including Authorization tokens) are sent on every request."
     },
     "loadingServers": "Loading servers…",
     "noConnectors": "No connectors configured yet.",
@@ -157,7 +164,7 @@
       "removeMessage": "Are you sure you want to remove \"{name}\"? This also deletes any saved sign-in tokens.",
       "removeConfirm": "Remove",
       "resetOauthTitle": "Reset OAuth and sign in again",
-      "resetOauthMessage": "This wipes saved tokens and re-registers Mike with \"{name}\" from scratch. Use when the connector is stuck on \"Client Not Registered\" or refuses to refresh. You'll be asked to sign in again.",
+      "resetOauthMessage": "This wipes saved tokens and re-registers Max with \"{name}\" from scratch. Use when the connector is stuck on \"Client Not Registered\" or refuses to refresh. You'll be asked to sign in again.",
       "resetOauthConfirm": "Reset and sign in",
       "resetOauth": "Reset OAuth",
       "resetOauthTryAgain": "Reset OAuth and try again"
@@ -315,7 +322,37 @@
     "title": "Share Chat",
     "shareLink": "Share Link",
     "copied": "Copied!",
-    "copyLink": "Copy Link"
+    "copyLink": "Copy Link",
+    "explainer": "Invite people by email. They'll receive a snapshot of this conversation; once they sign in with the same email they can join the chat and continue it with you.",
+    "addPeopleByEmail": "Add people by email…",
+    "sendInvites": "Send invites",
+    "sharing": "Sending…",
+    "peopleWithAccess": "People with access",
+    "none": "No one has been invited yet.",
+    "revoke": "Revoke invite",
+    "statusPending": "Pending",
+    "statusAccepted": "Joined",
+    "statusExpired": "Expired",
+    "statusRevoked": "Revoked",
+    "inviteSent": "{count, plural, one {Invite sent.} other {# invites sent.}}",
+    "inviteSentPartial": "{sent} sent, {failed} failed.",
+    "errorSendFailed": "Couldn't send the invite. Try again.",
+    "ownerFallback": "Someone",
+    "snapshotBannerTitle": "{name} shared this conversation with you.",
+    "snapshotBannerHint": "You're reading a snapshot from {date}.",
+    "snapshotBannerLive": "You already joined this conversation.",
+    "expiresOn": "Expires {date}",
+    "openInChat": "Open in chat",
+    "continueConversation": "Continue conversation",
+    "continueExplainer": "Continue the conversation together — you'll be added as a collaborator.",
+    "emptyChat": "This conversation is empty.",
+    "errorEmailMismatchTitle": "This invite is bound to a different email",
+    "errorEmailMismatchBody": "Sign in with the email address the invitation was sent to.",
+    "errorEmailMismatchBodyWithEmail": "Sign in with {email} to view this conversation.",
+    "errorExpiredTitle": "This share link is no longer active",
+    "errorExpiredBody": "Ask the sender to share the conversation again.",
+    "errorNotFoundTitle": "We couldn't find this conversation",
+    "errorNotFoundBody": "The link may have been mistyped or the share was deleted."
   },
   "documents": {
     "searchPlaceholder": "Search…",
@@ -323,10 +360,17 @@
     "noDocuments": "No documents yet",
     "uploading": "Uploading…",
     "upload": "Upload",
+    "uploadFiles": "Upload files",
+    "browseAll": "Browse all",
+    "addDocuments": "Add documents",
+    "documentLabel": "Document",
+    "documentsLabel": "Documents",
     "selected": "{count} selected",
     "confirm": "Confirm",
     "ownerOnlyDelete": "delete these documents — only the document creator can delete a document",
-    "ownerOnlyDeletePartial": "delete {count} of the selected documents — only the document creator can delete a document"
+    "ownerOnlyDeletePartial": "delete {count} of the selected documents — only the document creator can delete a document",
+    "connectProvider": "Connect {name}…",
+    "browseProvider": "From {name}…"
   },
   "uploadVersion": {
     "title": "Upload new version",
@@ -341,6 +385,22 @@
     "confirm": "Confirm",
     "ok": "OK",
     "notice": "Notice"
+  },
+  "confirmDelete": {
+    "deleteAction": "Delete",
+    "chatTitle": "Delete chat",
+    "chatBody": "Are you sure you want to delete this chat? All messages and attachments will be permanently removed and this cannot be undone.",
+    "chatBodyNamed": "Are you sure you want to delete the chat \"{title}\"? All messages and attachments will be permanently removed and this cannot be undone.",
+    "chatsTitle": "Delete chats",
+    "chatsBody": "Are you sure you want to delete {count} {count, plural, one {chat} other {chats}}? This cannot be undone.",
+    "reviewTitle": "Delete review",
+    "reviewBody": "Are you sure you want to delete this tabular review? This cannot be undone.",
+    "reviewBodyNamed": "Are you sure you want to delete the review \"{title}\"? This cannot be undone.",
+    "reviewsTitle": "Delete reviews",
+    "reviewsBody": "Are you sure you want to delete {count} {count, plural, one {review} other {reviews}}? This cannot be undone.",
+    "disconnectAction": "Disconnect",
+    "connectorTitle": "Disconnect connector",
+    "connectorBody": "Are you sure you want to disconnect {name}? Max won't be able to access files in that account again until you reconnect. Already-imported files stay in Max."
   },
   "newWorkflow": {
     "breadcrumbRoot": "Workflows",
@@ -415,7 +475,7 @@
     "pressEnterToAddTag": "Press Enter or comma to add a tag.",
     "prompt": "Prompt",
     "autoGeneratePrompt": "Auto-Generate Prompt",
-    "promptPlaceholder": "Write the analysis prompt — describe what Mike should extract from each document for this column…",
+    "promptPlaceholder": "Write the analysis prompt — describe what Max should extract from each document for this column…",
     "addAnotherColumn": "Add another column",
     "delete": "Delete",
     "cancel": "Cancel",
@@ -538,10 +598,174 @@
       "allDesc": "Automate document analysis with reusable prompts and tabular review templates."
     },
     "source": {
-      "mike": "Mike",
+      "mike": "Max",
       "myself": "Myself",
       "shared": "Shared",
       "sharedBy": "{name}"
+    },
+    "downloadAria": "Download workflow",
+    "upload": {
+      "aria": "Upload workflow",
+      "errors": {
+        "invalidJson": "File is not valid JSON.",
+        "notEnvelope": "File is not a workflow envelope.",
+        "wrongFormat": "Not a Max workflow file (missing or wrong 'format').",
+        "unsupportedVersion": "Unsupported workflow file version.",
+        "missingTitle": "Workflow file is missing a title.",
+        "badType": "Workflow type must be 'assistant' or 'tabular'.",
+        "badColumns": "columns_config must be an array.",
+        "generic": "Failed to upload workflow."
+      }
+    }
+  },
+  "streaming": {
+    "working": "Working",
+    "completedInSteps": "Completed in {count} {count, plural, one {step} other {steps}}",
+    "thinking": "Thinking...",
+    "pondering": "Pondering...",
+    "analyzing": "Analyzing...",
+    "reviewing": "Reviewing...",
+    "reasoning": "Reasoning...",
+    "thoughtProcess": "Thought process",
+    "reading": "Reading",
+    "read": "Read",
+    "finding": "Finding",
+    "found": "Found",
+    "matchCount": "{count} {count, plural, one {match} other {matches}}",
+    "inFile": "in {filename}",
+    "creating": "Creating",
+    "created": "Created",
+    "replicating": "Replicating",
+    "replicated": "Replicated",
+    "replicatedTimes": "{count} times",
+    "editing": "Editing",
+    "edited": "Edited",
+    "editFailed": "Edit failed",
+    "appliedWorkflow": "Applied Workflow",
+    "called": "Called",
+    "failed": "Failed",
+    "hideDetails": "Hide details",
+    "showDetails": "Show details",
+    "arguments": "Arguments",
+    "output": "Output",
+    "none": "(none)",
+    "empty": "(empty)",
+    "acceptAll": "Accept all",
+    "rejectAll": "Reject all",
+    "view": "View",
+    "collapseEdits": "Collapse edits",
+    "expandEdits": "Expand edits",
+    "trackedChangesAcrossDocs": "{changeCount} tracked {changeCount, plural, one {change} other {changes}} across {docCount} {docCount, plural, one {document} other {documents}}",
+    "trackedChanges": "{count} tracked {count, plural, one {change} other {changes}}",
+    "resolvedChangesAcrossDocs": "{changeCount} resolved tracked {changeCount, plural, one {change} other {changes}} across {docCount} {docCount, plural, one {document} other {documents}}",
+    "resolvedChanges": "{count} resolved tracked {count, plural, one {change} other {changes}}",
+    "searchChats": "Search chats…",
+    "noPreviousChats": "No previous chats.",
+    "noMatches": "No matches.",
+    "chat": "Chat",
+    "running": "Running",
+    "tool": "tool"
+  },
+  "wordAddin": {
+    "title": "Word Add-in",
+    "description": "Use Max directly inside Microsoft Word. The add-in connects to this account so your projects, chats, and uploads stay in sync.",
+    "steps": {
+      "pair": {
+        "title": "1. Generate a pairing code",
+        "description": "Each code is valid for 5 minutes and can be redeemed only once. After a Word add-in is paired, the access stays active until you sign out from Word.",
+        "generate": "Generate pairing code",
+        "regenerate": "Generate a new code",
+        "codeLabel": "Code",
+        "expiresIn": "Expires in {time}"
+      },
+      "install": {
+        "title": "2. Install the add-in in Word",
+        "step1": "Download the manifest.xml file below.",
+        "step2": "In Word, open the Insert tab, click Add-ins → Get Add-ins → Upload My Add-in.",
+        "step3": "Select the downloaded manifest.xml. The Max sidebar will appear on the Home tab.",
+        "step4": "Open the Max pane and paste the 6-digit pairing code when prompted.",
+        "downloadManifest": "Download manifest.xml"
+      },
+      "use": {
+        "title": "3. Start working",
+        "description": "Once paired you can chat with Max, attach project documents, request track-change suggestions, and let the assistant comment on a selection — all without leaving Word."
+      }
+    },
+    "errors": {
+      "generic": "Something went wrong. Please try again."
+    }
+  },
+  "projectPicker": {
+    "breadcrumbAssistant": "Assistant",
+    "breadcrumbStartChat": "Start Chat in a Project",
+    "searchPlaceholder": "Search projects…",
+    "groupHeading": "Projects",
+    "noMatches": "No matches found",
+    "noProjects": "No projects yet",
+    "cancel": "Cancel",
+    "continue": "Continue"
+  },
+  "workflowPicker": {
+    "breadcrumbs": {
+      "projects": "Projects",
+      "assistant": "Assistant",
+      "addWorkflow": "Add workflow"
+    },
+    "searchPlaceholder": "Search workflows…",
+    "noMatches": "No matches found",
+    "noAssistantWorkflows": "No assistant workflows found",
+    "badgeBuiltin": "Built-in",
+    "badgeCustom": "Custom",
+    "workflowPrompt": "Workflow Prompt",
+    "noPromptDefined": "No prompt defined.",
+    "cancel": "Cancel",
+    "use": "Use"
+  },
+  "builtinWorkflows": {
+    "cpChecklist": "Generate CP Checklist",
+    "changeOfControlReview": "Change of Control Review",
+    "creditAgreementSummary": "Credit Agreement Summary",
+    "commercialAgreementReview": "Commercial Agreement Review",
+    "creditAgreementReview": "Credit Agreement Review",
+    "eDiscoveryReview": "E-Discovery Review",
+    "supplyAgreementReview": "Supply Agreement Review",
+    "spaReview": "SPA Review",
+    "ndaReview": "NDA Review",
+    "commercialLeaseReview": "Commercial Lease Review",
+    "lpaReview": "Limited Partnership Agreement Review",
+    "shareholderAgreementSummary": "Shareholder Agreement Summary",
+    "shareholderAgreementReview": "Shareholder Agreement Review",
+    "employmentAgreementReview": "Employment Agreement Review"
+  },
+  "builtinPractices": {
+    "generalTransactions": "General Transactions",
+    "corporate": "Corporate",
+    "finance": "Finance",
+    "litigation": "Litigation",
+    "realEstate": "Real Estate",
+    "privateEquity": "Private Equity",
+    "employment": "Employment"
+  },
+  "connectorsPage": {
+    "title": "File sources",
+    "description": "Connect Google Drive, OneDrive, or Box to import documents directly into Max. Files are copied into Max at import time — later changes in the source don't modify the imported copy.",
+    "loading": "Loading connectors…",
+    "empty": "No file connectors are available right now. Contact your administrator.",
+    "notConfigured": "Not configured",
+    "notConnected": "Not connected",
+    "connectedAs": "Connected as {email}",
+    "contactAdmin": "The operator has not configured this connector",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "toasts": {
+      "connected": "Connector {name} connected successfully.",
+      "failed": "Failed to connect {name}.",
+      "failedWithError": "Failed to connect {name}: {error}"
+    },
+    "errors": {
+      "loadFailed": "Failed to load the connectors list.",
+      "startFailed": "Failed to start the OAuth flow.",
+      "disconnectFailed": "Disconnect failed."
     }
   }
 }

@@ -15,7 +15,9 @@
     "search": "Pretraži",
     "name": "Naziv",
     "email": "E-pošta",
-    "rename": "Preimenuj"
+    "rename": "Preimenuj",
+    "copy": "Kopiraj",
+    "copied": "Kopirano"
   },
   "sidebar": {
     "assistant": "Asistent",
@@ -58,7 +60,9 @@
     "tabs": {
       "general": "Općenito",
       "models": "Modeli i API ključevi",
-      "connectors": "Konektori"
+      "connectors": "Konektori",
+      "fileSources": "Izvori datoteka",
+      "wordAddin": "Word dodatak"
     },
     "profile": {
       "title": "Profil",
@@ -96,24 +100,27 @@
     "selectModel": "Odaberite model",
     "apiKeys": {
       "title": "API ključevi",
-      "description": "Morate unijeti vlastite API ključeve kako bi aplikacija radila ili dodati API ključeve u .env datoteku ako koristite vlastitu instancu Mike-a.",
+      "description": "Morate unijeti vlastite API ključeve kako bi aplikacija radila ili dodati API ključeve u .env datoteku ako koristite vlastitu instancu Maxa.",
       "titleGenNote": "Generiranje naslova automatski koristi najjeftiniji model od konfiguriranog pružatelja usluga (LocalLLM Lite ako je dostupan, inače Gemini Flash Lite, inače Claude Haiku).",
       "anthropic": "Anthropic (Claude) API ključ",
       "google": "Google (Gemini) API ključ",
       "openai": "OpenAI API ključ",
       "mistral": "Mistral AI API ključ",
       "addKeyTooltip": "Dodajte {provider} API ključ za korištenje ovog modela",
-      "failedSave": "Spremanje {label} nije uspjelo."
+      "failedSave": "Spremanje {label} nije uspjelo.",
+      "sharedKeyBadge": "Dijeljeni ključ dostupan",
+      "sharedKeyPlaceholder": "Koristi se dijeljeni ključ — zalijepi svoj da ga zamijeniš",
+      "sharedKeyHint": "Max će koristiti dijeljeni ključ koji je postavio administrator. Svoj ključ trebaš zalijepiti samo ako želiš koristiti zaseban račun."
     }
   },
   "connectors": {
     "title": "Konektori",
     "hideForm": "Sakrij obrazac",
     "addConnector": "Dodaj konektor",
-    "description": "Konektori povezuju vanjske alate s Mike-om putem Model Context Protocola (MCP) — pravne baze podataka, web istraživanje, interne API-je organizacije i drugo. Alati otkriveni iz svakog konektora postaju dostupni chat asistentu.",
+    "description": "Konektori povezuju vanjske alate s Maxom putem Model Context Protocola (MCP) — pravne baze podataka, web istraživanje, interne API-je organizacije i drugo. Alati otkriveni iz svakog konektora postaju dostupni chat asistentu.",
     "trustWarning": {
       "title": "Dodajte samo konektore kojima vjerujete",
-      "description": "Operator konektora može vidjeti sve što Mike šalje u pozivima alata — vaše upite, isječke dokumenata i odgovor samog alata. Prilagođena zaglavlja (uključujući Authorization tokene) šalju se sa svakim zahtjevom."
+      "description": "Operator konektora može vidjeti sve što Max šalje u pozivima alata — vaše upite, isječke dokumenata i odgovor samog alata. Prilagođena zaglavlja (uključujući Authorization tokene) šalju se sa svakim zahtjevom."
     },
     "loadingServers": "Učitavanje servera…",
     "noConnectors": "Još nema konfiguriranih konektora.",
@@ -157,7 +164,7 @@
       "removeMessage": "Jeste li sigurni da želite ukloniti \"{name}\"? Ovo također briše sve spremljene tokene za prijavu.",
       "removeConfirm": "Ukloni",
       "resetOauthTitle": "Resetiraj OAuth i prijavi se ponovo",
-      "resetOauthMessage": "Ovo briše spremljene tokene i ponovo registrira Mike s \"{name}\" od nule. Koristite kada je konektor zapeo na \"Client Not Registered\" ili odbija osvježavanje. Bit ćete upitani za ponovnu prijavu.",
+      "resetOauthMessage": "Ovo briše spremljene tokene i ponovo registrira Max s \"{name}\" od nule. Koristite kada je konektor zapeo na \"Client Not Registered\" ili odbija osvježavanje. Bit ćete upitani za ponovnu prijavu.",
       "resetOauthConfirm": "Resetiraj i prijavi se",
       "resetOauth": "Resetiraj OAuth",
       "resetOauthTryAgain": "Resetiraj OAuth i pokušaj ponovo"
@@ -315,7 +322,37 @@
     "title": "Podijeli razgovor",
     "shareLink": "Poveznica za dijeljenje",
     "copied": "Kopirano!",
-    "copyLink": "Kopiraj poveznicu"
+    "copyLink": "Kopiraj poveznicu",
+    "explainer": "Pozovi ljude e-mailom. Dobit će kopiju ovog razgovora; nakon što se prijave s istom e-mail adresom, mogu se pridružiti razgovoru i nastaviti ga s tobom.",
+    "addPeopleByEmail": "Dodaj ljude e-mailom…",
+    "sendInvites": "Pošalji pozive",
+    "sharing": "Šaljem…",
+    "peopleWithAccess": "Ljudi s pristupom",
+    "none": "Još nitko nije pozvan.",
+    "revoke": "Opozovi poziv",
+    "statusPending": "Na čekanju",
+    "statusAccepted": "Pridružen/a",
+    "statusExpired": "Isteklo",
+    "statusRevoked": "Opozvano",
+    "inviteSent": "{count, plural, one {Poziv poslan.} few {# poziva poslana.} other {# poziva poslano.}}",
+    "inviteSentPartial": "Poslano: {sent}, neuspješno: {failed}.",
+    "errorSendFailed": "Slanje poziva nije uspjelo. Pokušaj ponovno.",
+    "ownerFallback": "Netko",
+    "snapshotBannerTitle": "{name} je s tobom podijelio/la ovaj razgovor.",
+    "snapshotBannerHint": "Čitaš snimku razgovora od {date}.",
+    "snapshotBannerLive": "Već si se pridružio/la ovom razgovoru.",
+    "expiresOn": "Vrijedi do {date}",
+    "openInChat": "Otvori u chatu",
+    "continueConversation": "Nastavi razgovor",
+    "continueExplainer": "Nastavite razgovor zajedno — bit ćeš dodan/a kao suradnik/ca.",
+    "emptyChat": "Ovaj razgovor je prazan.",
+    "errorEmailMismatchTitle": "Ovaj poziv je vezan za drugu e-mail adresu",
+    "errorEmailMismatchBody": "Prijavi se s e-mail adresom na koju je poziv poslan.",
+    "errorEmailMismatchBodyWithEmail": "Prijavi se s {email} da vidiš ovaj razgovor.",
+    "errorExpiredTitle": "Ova poveznica više nije aktivna",
+    "errorExpiredBody": "Zamoli pošiljatelja da ponovno podijeli razgovor.",
+    "errorNotFoundTitle": "Nismo pronašli ovaj razgovor",
+    "errorNotFoundBody": "Poveznica je možda krivo upisana ili je dijeljenje izbrisano."
   },
   "documents": {
     "searchPlaceholder": "Pretraži…",
@@ -323,10 +360,17 @@
     "noDocuments": "Još nema dokumenata",
     "uploading": "Učitavanje…",
     "upload": "Učitaj",
+    "uploadFiles": "Učitaj datoteke",
+    "browseAll": "Pregledaj sve",
+    "addDocuments": "Dodaj dokumente",
+    "documentLabel": "Dokument",
+    "documentsLabel": "Dokumenti",
     "selected": "{count} odabrano",
     "confirm": "Potvrdi",
     "ownerOnlyDelete": "obrisati ove dokumente — samo autor dokumenta može obrisati dokument",
-    "ownerOnlyDeletePartial": "obrisati {count} od odabranih dokumenata — samo autor dokumenta može obrisati dokument"
+    "ownerOnlyDeletePartial": "obrisati {count} od odabranih dokumenata — samo autor dokumenta može obrisati dokument",
+    "connectProvider": "Poveži {name}…",
+    "browseProvider": "Iz {name}…"
   },
   "uploadVersion": {
     "title": "Učitaj novu verziju",
@@ -341,6 +385,22 @@
     "confirm": "Potvrdi",
     "ok": "U redu",
     "notice": "Obavijest"
+  },
+  "confirmDelete": {
+    "deleteAction": "Obriši",
+    "chatTitle": "Obriši razgovor",
+    "chatBody": "Jeste li sigurni da želite obrisati ovaj razgovor? Sve poruke i prilozi bit će trajno uklonjeni i radnja se ne može poništiti.",
+    "chatBodyNamed": "Jeste li sigurni da želite obrisati razgovor \"{title}\"? Sve poruke i prilozi bit će trajno uklonjeni i radnja se ne može poništiti.",
+    "chatsTitle": "Obriši razgovore",
+    "chatsBody": "Jeste li sigurni da želite obrisati {count} {count, plural, one {razgovor} few {razgovora} other {razgovora}}? Radnja se ne može poništiti.",
+    "reviewTitle": "Obriši pregled",
+    "reviewBody": "Jeste li sigurni da želite obrisati ovaj tabularni pregled? Radnja se ne može poništiti.",
+    "reviewBodyNamed": "Jeste li sigurni da želite obrisati pregled \"{title}\"? Radnja se ne može poništiti.",
+    "reviewsTitle": "Obriši preglede",
+    "reviewsBody": "Jeste li sigurni da želite obrisati {count} {count, plural, one {pregled} few {pregleda} other {pregleda}}? Radnja se ne može poništiti.",
+    "disconnectAction": "Odspoji",
+    "connectorTitle": "Odspoji konektor",
+    "connectorBody": "Jeste li sigurni da želite odspojiti {name}? Max više neće moći pristupati datotekama na tom računu dok se ponovno ne povežete. Već uvezene datoteke ostaju u Maxu."
   },
   "newWorkflow": {
     "breadcrumbRoot": "Radni tijekovi",
@@ -415,7 +475,7 @@
     "pressEnterToAddTag": "Pritisnite Enter ili zarez za dodavanje oznake.",
     "prompt": "Prompt",
     "autoGeneratePrompt": "Automatski generiraj prompt",
-    "promptPlaceholder": "Napišite prompt za analizu — opišite što Mike treba izdvojiti iz svakog dokumenta za ovaj stupac…",
+    "promptPlaceholder": "Napišite prompt za analizu — opišite što Max treba izdvojiti iz svakog dokumenta za ovaj stupac…",
     "addAnotherColumn": "Dodaj još jedan stupac",
     "delete": "Obriši",
     "cancel": "Odustani",
@@ -538,10 +598,174 @@
       "allDesc": "Automatizirajte analizu dokumenata pomoću višekratnih promptova i predložaka za tablične preglede."
     },
     "source": {
-      "mike": "Maks",
+      "mike": "Max",
       "myself": "Ja",
       "shared": "Podijeljeno",
       "sharedBy": "{name}"
+    },
+    "downloadAria": "Preuzmi radni tijek",
+    "upload": {
+      "aria": "Prenesi radni tijek",
+      "errors": {
+        "invalidJson": "Datoteka nije ispravan JSON.",
+        "notEnvelope": "Datoteka nije Max radni tijek.",
+        "wrongFormat": "Pogrešan format — očekivan 'mike.workflow'.",
+        "unsupportedVersion": "Nepodržana verzija datoteke radnog tijeka.",
+        "missingTitle": "Datoteka radnog tijeka nema naziv.",
+        "badType": "Vrsta mora biti 'assistant' ili 'tabular'.",
+        "badColumns": "Polje 'columns_config' mora biti niz.",
+        "generic": "Prijenos radnog tijeka nije uspio."
+      }
+    }
+  },
+  "streaming": {
+    "working": "Obrada",
+    "completedInSteps": "Završeno u {count} {count, plural, one {koraku} few {koraka} other {koraka}}",
+    "thinking": "Razmišljam...",
+    "pondering": "Promišljam...",
+    "analyzing": "Analiziram...",
+    "reviewing": "Pregledam...",
+    "reasoning": "Zaključujem...",
+    "thoughtProcess": "Proces razmišljanja",
+    "reading": "Čitam",
+    "read": "Pročitano",
+    "finding": "Tražim",
+    "found": "Pronađeno",
+    "matchCount": "{count} {count, plural, one {rezultat} few {rezultata} other {rezultata}}",
+    "inFile": "u {filename}",
+    "creating": "Izrađujem",
+    "created": "Izrađeno",
+    "replicating": "Repliciram",
+    "replicated": "Replicirano",
+    "replicatedTimes": "{count} puta",
+    "editing": "Uređujem",
+    "edited": "Uređeno",
+    "editFailed": "Uređivanje nije uspjelo",
+    "appliedWorkflow": "Primijenjen radni tijek",
+    "called": "Pozvano",
+    "failed": "Neuspješno",
+    "hideDetails": "Sakrij detalje",
+    "showDetails": "Prikaži detalje",
+    "arguments": "Argumenti",
+    "output": "Rezultat",
+    "none": "(nema)",
+    "empty": "(prazno)",
+    "acceptAll": "Prihvati sve",
+    "rejectAll": "Odbaci sve",
+    "view": "Pregledaj",
+    "collapseEdits": "Skupi izmjene",
+    "expandEdits": "Proširi izmjene",
+    "trackedChangesAcrossDocs": "{changeCount} {changeCount, plural, one {praćena izmjena} few {praćene izmjene} other {praćenih izmjena}} u {docCount} {docCount, plural, one {dokumentu} few {dokumenta} other {dokumenata}}",
+    "trackedChanges": "{count} {count, plural, one {praćena izmjena} few {praćene izmjene} other {praćenih izmjena}}",
+    "resolvedChangesAcrossDocs": "{changeCount} {changeCount, plural, one {riješena praćena izmjena} few {riješene praćene izmjene} other {riješenih praćenih izmjena}} u {docCount} {docCount, plural, one {dokumentu} few {dokumenta} other {dokumenata}}",
+    "resolvedChanges": "{count} {count, plural, one {riješena praćena izmjena} few {riješene praćene izmjene} other {riješenih praćenih izmjena}}",
+    "searchChats": "Pretraži razgovore…",
+    "noPreviousChats": "Nema prethodnih razgovora.",
+    "noMatches": "Nema rezultata.",
+    "chat": "Razgovor",
+    "running": "Pokrenuto",
+    "tool": "alat"
+  },
+  "wordAddin": {
+    "title": "Word dodatak",
+    "description": "Koristite Max izravno u Microsoft Wordu. Dodatak se povezuje s ovim računom kako bi vaši predmeti, razgovori i učitani dokumenti ostali sinkronizirani.",
+    "steps": {
+      "pair": {
+        "title": "1. Generirajte kod za uparivanje",
+        "description": "Svaki kod vrijedi 5 minuta i može se iskoristiti samo jednom. Nakon što se Word dodatak upari, pristup ostaje aktivan dok se ne odjavite iz Worda.",
+        "generate": "Generiraj kod za uparivanje",
+        "regenerate": "Generiraj novi kod",
+        "codeLabel": "Kod",
+        "expiresIn": "Istječe za {time}"
+      },
+      "install": {
+        "title": "2. Instalirajte dodatak u Word",
+        "step1": "Preuzmite manifest.xml datoteku ispod.",
+        "step2": "U Wordu otvorite karticu Insert (Umetni), kliknite Add-ins → Get Add-ins → Upload My Add-in.",
+        "step3": "Odaberite preuzeti manifest.xml. Max bočni panel pojavit će se na kartici Home.",
+        "step4": "Otvorite Max panel i zalijepite 6-znamenkasti kod kada to bude zatraženo.",
+        "downloadManifest": "Preuzmi manifest.xml"
+      },
+      "use": {
+        "title": "3. Krenite s radom",
+        "description": "Nakon uparivanja možete razgovarati s Mikeom, priložiti dokumente predmeta, tražiti prijedloge u načinu Track Changes i tražiti od asistenta komentare na označeni tekst — sve bez napuštanja Worda."
+      }
+    },
+    "errors": {
+      "generic": "Nešto je pošlo po krivu. Pokušajte ponovno."
+    }
+  },
+  "projectPicker": {
+    "breadcrumbAssistant": "Asistent",
+    "breadcrumbStartChat": "Pokreni razgovor u predmetu",
+    "searchPlaceholder": "Pretraži predmete…",
+    "groupHeading": "Predmeti",
+    "noMatches": "Nema pronađenih rezultata",
+    "noProjects": "Još nema predmeta",
+    "cancel": "Odustani",
+    "continue": "Nastavi"
+  },
+  "workflowPicker": {
+    "breadcrumbs": {
+      "projects": "Predmeti",
+      "assistant": "Asistent",
+      "addWorkflow": "Dodaj radni tijek"
+    },
+    "searchPlaceholder": "Pretraži radne tijekove…",
+    "noMatches": "Nema pronađenih rezultata",
+    "noAssistantWorkflows": "Nema radnih tijekova asistenta",
+    "badgeBuiltin": "Ugrađeno",
+    "badgeCustom": "Prilagođeno",
+    "workflowPrompt": "Upit radnog tijeka",
+    "noPromptDefined": "Upit nije definiran.",
+    "cancel": "Odustani",
+    "use": "Koristi"
+  },
+  "builtinWorkflows": {
+    "cpChecklist": "Generiraj CP popis",
+    "changeOfControlReview": "Pregled promjene kontrole",
+    "creditAgreementSummary": "Sažetak kreditnog ugovora",
+    "commercialAgreementReview": "Pregled komercijalnog ugovora",
+    "creditAgreementReview": "Pregled kreditnog ugovora",
+    "eDiscoveryReview": "E-Discovery pregled",
+    "supplyAgreementReview": "Pregled ugovora o nabavi",
+    "spaReview": "Pregled SPA ugovora",
+    "ndaReview": "Pregled NDA ugovora",
+    "commercialLeaseReview": "Pregled komercijalnog najma",
+    "lpaReview": "Pregled ugovora o komanditnom društvu",
+    "shareholderAgreementSummary": "Sažetak ugovora dioničara",
+    "shareholderAgreementReview": "Pregled ugovora dioničara",
+    "employmentAgreementReview": "Pregled ugovora o radu"
+  },
+  "builtinPractices": {
+    "generalTransactions": "Opće transakcije",
+    "corporate": "Korporativno",
+    "finance": "Financije",
+    "litigation": "Parnice",
+    "realEstate": "Nekretnine",
+    "privateEquity": "Privatni kapital",
+    "employment": "Radni odnosi"
+  },
+  "connectorsPage": {
+    "title": "Izvori datoteka",
+    "description": "Povežite Google Drive, OneDrive ili Box kako biste uvozili dokumente izravno u Max. Datoteke se kopiraju u Max pri uvozu — kasnije promjene u izvoru ne mijenjaju uvezenu kopiju.",
+    "loading": "Učitavanje konektora…",
+    "empty": "Trenutno nema dostupnih konektora datoteka. Obratite se administratoru.",
+    "notConfigured": "Nije postavljeno",
+    "notConnected": "Nije povezano",
+    "connectedAs": "Povezano kao {email}",
+    "contactAdmin": "Operator nije postavio ovaj konektor",
+    "connect": "Poveži",
+    "disconnect": "Odspoji",
+    "toasts": {
+      "connected": "Konektor {name} uspješno povezan.",
+      "failed": "Povezivanje konektora {name} nije uspjelo.",
+      "failedWithError": "Povezivanje konektora {name} nije uspjelo: {error}"
+    },
+    "errors": {
+      "loadFailed": "Učitavanje liste konektora nije uspjelo.",
+      "startFailed": "Pokretanje OAuth procesa nije uspjelo.",
+      "disconnectFailed": "Odspajanje nije uspjelo."
     }
   }
 }

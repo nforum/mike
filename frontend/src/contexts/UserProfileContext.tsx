@@ -22,6 +22,18 @@ interface UserProfile {
     geminiApiKey: string | null;
     openaiApiKey: string | null;
     mistralApiKey: string | null;
+    /**
+     * Booleans (not values) indicating whether the operator has wired
+     * up a server-level API key for each provider via env / Secret
+     * Manager. When true, the user doesn't need to paste their own key
+     * — the Settings UI shows a "shared key available" affordance.
+     */
+    serverKeys: {
+        claude: boolean;
+        gemini: boolean;
+        openai: boolean;
+        mistral: boolean;
+    };
 }
 
 interface UserProfileContextType {
@@ -46,7 +58,7 @@ const UserProfileContext = createContext<UserProfileContextType | undefined>(
 );
 
 const API_BASE =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
+    process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "http://localhost:3001";
 
 const MONTHLY_CREDIT_LIMIT = 999999; // temporarily unlimited
 
@@ -94,6 +106,12 @@ function mapServerProfile(data: any): UserProfile {
         geminiApiKey: data.gemini_api_key ?? null,
         openaiApiKey: data.openai_api_key ?? null,
         mistralApiKey: data.mistral_api_key ?? null,
+        serverKeys: {
+            claude: !!data.server_keys?.claude,
+            gemini: !!data.server_keys?.gemini,
+            openai: !!data.server_keys?.openai,
+            mistral: !!data.server_keys?.mistral,
+        },
     };
 }
 
@@ -109,6 +127,12 @@ const DEFAULT_PROFILE: UserProfile = {
     geminiApiKey: null,
     openaiApiKey: null,
     mistralApiKey: null,
+    serverKeys: {
+        claude: false,
+        gemini: false,
+        openai: false,
+        mistral: false,
+    },
 };
 
 export function UserProfileProvider({ children }: { children: ReactNode }) {

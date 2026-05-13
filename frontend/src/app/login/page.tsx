@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { SiteLogo } from "@/components/site-logo";
 import { useAuth } from "@/contexts/AuthContext";
-import { startAuthorizationFlow } from "@/lib/oauth";
+import {
+    startAuthorizationFlow,
+    stashPostLoginRedirect,
+    consumePostLoginRedirect,
+} from "@/lib/oauth";
 
 export default function LoginPage() {
     const router = useRouter();
@@ -14,12 +18,43 @@ export default function LoginPage() {
     const t = useTranslations("login");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const autoLoginTriggered = useRef(false);
+
+    // Stash the deep-link target as early as possible — the OAuth round
+    // trip will wipe the URL by the time we land back here. Same-origin
+    // whitelist enforced inside `stashPostLoginRedirect`.
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const params = new URLSearchParams(window.location.search);
+        const raw = params.get("next") ?? params.get("redirect");
+        if (raw) stashPostLoginRedirect(raw);
+    }, []);
 
     useEffect(() => {
         if (!authLoading && isAuthenticated) {
-            router.replace("/assistant");
+            const next = consumePostLoginRedirect();
+            router.replace(next ?? "/assistant");
         }
     }, [authLoading, isAuthenticated, router]);
+
+    // After social login (Google/LinkedIn), WordPress sets a session and
+    // redirects back here with ?social_done=1. Auto-trigger the OAuth PKCE
+    // flow immediately so the user lands in the app without an extra click.
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("social_done") !== "1") return;
+        if (autoLoginTriggered.current) return;
+        autoLoginTriggered.current = true;
+        setLoading(true);
+        setError(null);
+        startAuthorizationFlow()
+            .then((url) => { window.location.href = url; })
+            .catch((err: any) => {
+                setError(err.message || "Failed to start login flow");
+                setLoading(false);
+            });
+    }, []);
 
     const handleLogin = async () => {
         setLoading(true);
@@ -33,18 +68,29 @@ export default function LoginPage() {
         }
     };
 
-    const handleSocialLogin = (provider: "google" | "linkedin") => {
-        // Social login goes through WordPress social auth plugin
-        // which sets a WP session, then we redirect back to OAuth flow
-        const returnUrl = typeof window !== "undefined"
-            ? `${window.location.origin}/login`
-            : "";
-        const baseUrl = "https://eulex.ai";
-        const url =
-            provider === "google"
-                ? `${baseUrl}/google-auth-start?redirect_to=${encodeURIComponent(returnUrl)}`
-                : `${baseUrl}/linkedin-auth-start?redirect_to=${encodeURIComponent(returnUrl)}`;
-        window.location.href = url;
+    const handleSocialLogin = async (provider: "google" | "linkedin") => {
+        setLoading(true);
+        setError(null);
+        try {
+            // Start the PKCE flow first — this stores verifier+state in sessionStorage
+            // so they survive the cross-origin redirect round-trip.
+            const oauthUrl = await startAuthorizationFlow();
+
+            // After WordPress social login, redirect back to our OAuth authorize URL
+            // so it auto-completes the PKCE exchange (user is already logged in at this point).
+            // We encode it as redirect_to so WordPress forwards us there post-login.
+            const returnUrl = oauthUrl; // Full eulex.ai/authorize?code_challenge=...&state=...
+
+            const baseUrl = "https://eulex.ai";
+            const url =
+                provider === "google"
+                    ? `${baseUrl}/google-auth-start?context=login&redirect_to=${encodeURIComponent(returnUrl)}`
+                    : `${baseUrl}/linkedin-auth-start?context=login&redirect_to=${encodeURIComponent(returnUrl)}`;
+            window.location.href = url;
+        } catch (err: any) {
+            setError(err.message || "Failed to start login flow");
+            setLoading(false);
+        }
     };
 
     return (

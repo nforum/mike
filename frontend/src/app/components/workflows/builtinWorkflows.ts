@@ -1244,3 +1244,88 @@ export const BUILT_IN_WORKFLOWS: MikeWorkflow[] = [
 ];
 
 export const BUILT_IN_IDS = new Set(BUILT_IN_WORKFLOWS.map((wf) => wf.id));
+
+/**
+ * Map from built-in workflow id → i18n key under the `builtinWorkflows`
+ * namespace in messages/{en,hr}.json. Used by getLocalizedWorkflowTitle()
+ * so the title rendered in the UI matches the user's locale even though
+ * the underlying data lives in code as English literals.
+ *
+ * When you add a new built-in above:
+ *   1. add an entry here,
+ *   2. add the matching string to en.json AND hr.json under
+ *      "builtinWorkflows": { "<key>": "<translated title>" }.
+ */
+export const BUILTIN_TITLE_KEYS: Record<string, string> = {
+    "builtin-cp-checklist": "cpChecklist",
+    "builtin-coc-dd": "changeOfControlReview",
+    "builtin-credit-summary": "creditAgreementSummary",
+    "builtin-commercial-agreement": "commercialAgreementReview",
+    "builtin-credit-agreement": "creditAgreementReview",
+    "builtin-ediscovery": "eDiscoveryReview",
+    "builtin-supply-agreement": "supplyAgreementReview",
+    "builtin-spa": "spaReview",
+    "builtin-nda": "ndaReview",
+    "builtin-commercial-lease": "commercialLeaseReview",
+    "builtin-lpa": "lpaReview",
+    "builtin-sha-summary": "shareholderAgreementSummary",
+    "builtin-shareholder-agreement": "shareholderAgreementReview",
+    "builtin-employment-agreement": "employmentAgreementReview",
+};
+
+/**
+ * Practice areas appear as small text next to workflows. Limited set of
+ * known values stored in code in English; we slug them to look up
+ * translations under the `builtinPractices` namespace.
+ */
+const PRACTICE_KEYS: Record<string, string> = {
+    "General Transactions": "generalTransactions",
+    Corporate: "corporate",
+    Finance: "finance",
+    Litigation: "litigation",
+    "Real Estate": "realEstate",
+    "Private Equity": "privateEquity",
+    Employment: "employment",
+};
+
+/**
+ * Returns the title for a workflow in the user's locale. Falls back to
+ * the raw `title` field for custom workflows (user-created), workflows
+ * without a localization key, or whenever a translation is missing.
+ *
+ * Pass next-intl's `useTranslations("builtinWorkflows")` result as `t`.
+ */
+export function getLocalizedWorkflowTitle(
+    workflow: { id: string; title: string },
+    t: (key: string) => string,
+): string {
+    const key = BUILTIN_TITLE_KEYS[workflow.id];
+    if (!key) return workflow.title;
+    try {
+        const translated = t(key);
+        // next-intl returns the raw key if a translation is missing —
+        // detect that and fall back to the English literal so the UI
+        // never shows a debug-style key like "cpChecklist".
+        return translated === key ? workflow.title : translated;
+    } catch {
+        return workflow.title;
+    }
+}
+
+/**
+ * Same idea for the practice tag. `t` is `useTranslations("builtinPractices")`.
+ */
+export function getLocalizedPractice(
+    practice: string | null | undefined,
+    t: (key: string) => string,
+): string {
+    if (!practice) return "";
+    const key = PRACTICE_KEYS[practice];
+    if (!key) return practice;
+    try {
+        const translated = t(key);
+        return translated === key ? practice : translated;
+    } catch {
+        return practice;
+    }
+}

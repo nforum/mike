@@ -12,6 +12,7 @@ import {
 import { useChatHistoryContext } from "@/app/contexts/ChatHistoryContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { OwnerOnlyModal } from "@/app/components/shared/OwnerOnlyModal";
+import { useConfirmDialog } from "@/app/components/modals/confirm-dialog";
 import type { MikeChat } from "@/app/components/shared/types";
 
 interface Props {
@@ -26,6 +27,9 @@ export function SidebarChatItem({ chat, isActive, onSelect, projectName }: Props
     const { user } = useAuth();
     const t = useTranslations("chatItem");
     const tc = useTranslations("common");
+    const tDelete = useTranslations("confirmDelete");
+    const { confirm: confirmDialog, dialog: confirmDialogEl } =
+        useConfirmDialog();
     const [isRenaming, setIsRenaming] = useState(false);
     const [editTitle, setEditTitle] = useState(chat.title ?? "");
     const [ownerOnlyAction, setOwnerOnlyAction] = useState<string | null>(null);
@@ -131,11 +135,24 @@ export function SidebarChatItem({ chat, isActive, onSelect, projectName }: Props
                                 {tc("rename")}
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                                onClick={() => {
+                                onClick={async () => {
                                     if (!isChatOwner) {
                                         setOwnerOnlyAction(t("deleteThisChat"));
                                         return;
                                     }
+                                    const trimmed = chat.title?.trim();
+                                    const ok = await confirmDialog({
+                                        title: tDelete("chatTitle"),
+                                        message: trimmed
+                                            ? tDelete("chatBodyNamed", {
+                                                  title: trimmed,
+                                              })
+                                            : tDelete("chatBody"),
+                                        confirmLabel:
+                                            tDelete("deleteAction"),
+                                        destructive: true,
+                                    });
+                                    if (!ok) return;
                                     void deleteChat(chat.id);
                                 }}
                                 className="text-red-600 focus:text-red-600"
@@ -152,6 +169,7 @@ export function SidebarChatItem({ chat, isActive, onSelect, projectName }: Props
                 action={ownerOnlyAction ?? undefined}
                 onClose={() => setOwnerOnlyAction(null)}
             />
+            {confirmDialogEl}
         </div>
     );
 }

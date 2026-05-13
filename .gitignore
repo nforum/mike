@@ -18,3 +18,8 @@ next-env.d.ts
 coverage
 
 vanjske_datoteke/
+
+# Word add-in production bundle is emitted by `cd word-addin && npm run build`
+# directly into the frontend's public folder. Treat it as a build artifact —
+# rebuild it on every deploy.
+frontend/public/word-addin/

@@ -1,5 +1,5 @@
 /**
- * Mike API client — all requests to the Node.js backend.
+ * Max API client — all requests to the Node.js backend.
  * Attaches the OAuth JWT token for user authentication.
  */
 
@@ -39,8 +39,14 @@ interface ServerChatDetailOut {
     messages: ServerMessage[];
 }
 
+// `??` only coalesces on null/undefined — a blank env var (which happened
+// once when the Dockerfile exported `ENV NEXT_PUBLIC_API_BASE_URL=` even
+// without a build-arg) would slip through and make API_BASE = "", which
+// silently routed every backend call to the frontend origin and surfaced
+// as 404 page-not-found HTML for /chat, /user/profile, /auth/pair/start.
+// Treat whitespace-only values as unset too.
 const API_BASE =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
+    process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "http://localhost:3001";
 
 function getAuthHeader(): Record<string, string> {
     const tokens = getStoredTokens();
@@ -105,6 +111,24 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
     }
 
     return (await response.json()) as T;
+}
+
+// ---------------------------------------------------------------------------
+// Word add-in pairing
+// ---------------------------------------------------------------------------
+
+export interface PairingCode {
+    code: string;
+    expires_at: string;
+    ttl_seconds: number;
+}
+
+export async function startPairingCode(): Promise<PairingCode> {
+    return apiRequest<PairingCode>("/auth/pair/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -441,6 +465,123 @@ export async function renameChat(chatId: string, title: string): Promise<void> {
 
 export async function deleteChat(chatId: string): Promise<void> {
     await apiRequest(`/chat/${chatId}`, { method: "DELETE" });
+}
+
+// ---------------------------------------------------------------------------
+// Chat sharing (email-bound invites — backend/routes/chatShares.ts)
+// ---------------------------------------------------------------------------
+
+export interface ChatShare {
+    id: string;
+    shared_with_email: string;
+    created_at: string;
+    expires_at: string;
+    accepted_at: string | null;
+    revoked_at: string | null;
+}
+
+export interface ShareChatResponse {
+    sent: string[];
+    failures: { email: string; reason: string }[];
+    shares: ChatShare[];
+}
+
+export async function shareChat(
+    chatId: string,
+    payload: { emails: string[] },
+): Promise<ShareChatResponse> {
+    return apiRequest<ShareChatResponse>(`/chat/${chatId}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+}
+
+export async function listChatShares(chatId: string): Promise<ChatShare[]> {
+    return apiRequest<ChatShare[]>(`/chat/${chatId}/shares`);
+}
+
+export async function deleteChatShare(
+    chatId: string,
+    shareId: string,
+): Promise<void> {
+    await apiRequest(`/chat/${chatId}/shares/${shareId}`, { method: "DELETE" });
+}
+
+export interface SharedChatDetail {
+    mode: "snapshot" | "live";
+    chat: MikeChat;
+    /**
+     * Server returns raw chat_messages rows — the share page renders
+     * them through the same mapping as `getChat()` for visual parity.
+     */
+    messages: ServerMessage[];
+    shared_at: string;
+    expires_at: string;
+    accepted_at: string | null;
+    owner: {
+        display_name: string | null;
+        email: string | null;
+    };
+    redirect_to: string;
+}
+
+export interface SharedChatView {
+    mode: "snapshot" | "live";
+    chat: MikeChat;
+    messages: MikeMessage[];
+    shared_at: string;
+    expires_at: string;
+    accepted_at: string | null;
+    owner: { display_name: string | null; email: string | null };
+    redirect_to: string;
+}
+
+/** Mirrors `getChat()`'s ServerMessage → MikeMessage normalization. */
+function mapServerMessages(serverMessages: ServerMessage[]): MikeMessage[] {
+    return serverMessages.map((m) => {
+        if (m.role === "user") {
+            return {
+                role: "user",
+                content: typeof m.content === "string" ? m.content : "",
+                files: m.files ?? undefined,
+                workflow: m.workflow ?? undefined,
+            };
+        }
+        const events = Array.isArray(m.content)
+            ? (m.content as AssistantEvent[])
+            : undefined;
+        return {
+            role: "assistant",
+            content:
+                events
+                    ?.filter((e) => e.type === "content")
+                    .map((e) => (e as { type: "content"; text: string }).text)
+                    .join("") ?? "",
+            annotations: m.annotations ?? undefined,
+            events,
+        };
+    });
+}
+
+export async function getSharedChat(token: string): Promise<SharedChatView> {
+    const raw = await apiRequest<SharedChatDetail>(
+        `/share/${encodeURIComponent(token)}`,
+    );
+    return {
+        ...raw,
+        messages: mapServerMessages(raw.messages),
+    };
+}
+
+export async function acceptSharedChat(
+    token: string,
+): Promise<{ chat_id: string; project_id: string | null; redirect_to: string }> {
+    return apiRequest(`/share/${encodeURIComponent(token)}/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+    });
 }
 
 export async function generateChatTitle(
@@ -935,5 +1076,89 @@ export async function resetMcpOauth(id: string): Promise<void> {
 export async function testMcpServer(id: string): Promise<McpServerTestResult> {
     return apiRequest<McpServerTestResult>(`/user/mcp-servers/${id}/test`, {
         method: "POST",
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// File-source connectors (Google Drive / OneDrive / Box).
+// Backend: backend/src/routes/integrations.ts
+// ─────────────────────────────────────────────────────────────────────
+
+export type IntegrationProviderId = "google_drive" | "onedrive" | "box";
+
+export interface IntegrationProviderStatus {
+    id: IntegrationProviderId;
+    display_name: string;
+    /** Operator wired the env-var credentials for this provider. */
+    configured: boolean;
+    /** This user has authorized the connector. */
+    connected: boolean;
+    account_email: string | null;
+    account_name: string | null;
+    expires_at: string | null;
+}
+
+export interface IntegrationFile {
+    id: string;
+    name: string;
+    mime_type: string;
+    size_bytes: number | null;
+    modified_at: string | null;
+    revision: string | null;
+    web_url: string | null;
+    parent: string | null;
+}
+
+export interface IntegrationFileListing {
+    files: IntegrationFile[];
+    next_page_token: string | null;
+}
+
+export async function listIntegrations(): Promise<{
+    providers: IntegrationProviderStatus[];
+}> {
+    return apiRequest<{ providers: IntegrationProviderStatus[] }>(
+        "/integrations",
+    );
+}
+
+export async function startIntegrationOAuth(
+    provider: IntegrationProviderId,
+): Promise<{ authorize_url: string }> {
+    return apiRequest<{ authorize_url: string }>(
+        `/integrations/${provider}/oauth/start`,
+        { method: "POST" },
+    );
+}
+
+export async function disconnectIntegration(
+    provider: IntegrationProviderId,
+): Promise<void> {
+    await apiRequest(`/integrations/${provider}`, { method: "DELETE" });
+}
+
+export async function listIntegrationFiles(
+    provider: IntegrationProviderId,
+    opts: { q?: string; page_token?: string; page_size?: number } = {},
+): Promise<IntegrationFileListing> {
+    const params = new URLSearchParams();
+    if (opts.q) params.set("q", opts.q);
+    if (opts.page_token) params.set("page_token", opts.page_token);
+    if (opts.page_size) params.set("page_size", String(opts.page_size));
+    const qs = params.toString();
+    return apiRequest<IntegrationFileListing>(
+        `/integrations/${provider}/files${qs ? `?${qs}` : ""}`,
+    );
+}
+
+export async function importIntegrationFile(
+    provider: IntegrationProviderId,
+    file_id: string,
+    project_id: string | null,
+): Promise<MikeDocument> {
+    return apiRequest<MikeDocument>(`/integrations/${provider}/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_id, project_id }),
     });
 }
