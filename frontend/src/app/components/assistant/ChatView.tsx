@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState, useRef, useEffect } from "react";
-import { ArrowDown, Share2 } from "lucide-react";
+import { ArrowDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { UserMessage } from "./UserMessage";
 import { AssistantMessage } from "./AssistantMessage";
@@ -32,6 +32,12 @@ interface Props {
      */
     chatId?: string;
     chatTitle?: string | null;
+    /**
+     * Notifier for the "Not appropriate answer" flag — fires after a
+     * successful toggle so the parent can persist the new state into
+     * its message list (which is the source of truth for re-renders).
+     */
+    onFlagChange?: (messageId: string, flagged: boolean) => void;
 }
 
 export function ChatView({
@@ -41,8 +47,10 @@ export function ChatView({
     cancel,
     chatId,
     chatTitle,
+    onFlagChange,
 }: Props) {
     const tShare = useTranslations("shareChat");
+    const t = useTranslations("assistant");
     const [shareOpen, setShareOpen] = useState(false);
     const [tabs, setTabs] = useState<AssistantSidePanelTab[]>([]);
     const [activeTabId, setActiveTabId] = useState<string | null>(null);
@@ -460,15 +468,6 @@ export function ChatView({
         <div className="h-full w-full flex relative">
             {/* Chat column */}
             <div className="flex flex-col h-full flex-1 relative">
-                {chatId && messages.length > 0 && (
-                    <button
-                        onClick={() => setShareOpen(true)}
-                        title={tShare("title")}
-                        className="absolute right-3 top-3 z-10 flex items-center justify-center p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
-                    >
-                        <Share2 className="h-4 w-4" />
-                    </button>
-                )}
                 {/* Scrollable messages */}
                 <div
                     ref={messagesContainerRef}
@@ -565,6 +564,18 @@ export function ChatView({
                                                 resolvedEditStatuses={
                                                     resolvedEditStatuses
                                                 }
+                                                isLast={
+                                                    i === lastAssistantIndex
+                                                }
+                                                onShareClick={
+                                                    chatId
+                                                        ? () =>
+                                                              setShareOpen(true)
+                                                        : undefined
+                                                }
+                                                messageId={msg.id}
+                                                flagged={!!msg.flagged}
+                                                onFlagChange={onFlagChange}
                                             />
                                         )}
                                     </div>
@@ -604,8 +615,7 @@ export function ChatView({
                             />
                             <div className="py-3 text-center">
                                 <p className="text-xs text-gray-500">
-                                    AI can make mistakes. Answers are not legal
-                                    advice.
+                                    {t("disclaimer")}
                                 </p>
                             </div>
                         </div>

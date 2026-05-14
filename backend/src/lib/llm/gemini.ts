@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import type {
     StreamChatParams,
     StreamChatResult,
@@ -43,10 +43,20 @@ function toNativeContents(messages: StreamChatParams["messages"]): GeminiContent
 export async function streamGemini(
     params: StreamChatParams,
 ): Promise<StreamChatResult> {
-    const { model, systemPrompt, tools = [], callbacks = {}, runTools, apiKeys, enableThinking } = params;
+    const { model, systemPrompt, tools = [], callbacks = {}, runTools, apiKeys, enableThinking, reasoningEffort } = params;
     const maxIter = params.maxIterations ?? 10;
     const ai = client(apiKeys?.gemini);
     const functionDeclarations = toGeminiTools(tools);
+    // Gemini's `ThinkingLevel` enum uses uppercase string values
+    // ("LOW" | "MEDIUM" | "HIGH"); our public effort knob is lowercase
+    // to match the OpenAI/Anthropic naming. Map between them here so
+    // the SDK doesn't reject the request with a 400.
+    const thinkingLevel: ThinkingLevel =
+        reasoningEffort === "low"
+            ? ThinkingLevel.LOW
+            : reasoningEffort === "medium"
+              ? ThinkingLevel.MEDIUM
+              : ThinkingLevel.HIGH;
 
     const contents: GeminiContent[] = toNativeContents(params.messages);
     let fullText = "";
@@ -60,12 +70,14 @@ export async function streamGemini(
                 tools: functionDeclarations.length
                     ? [{ functionDeclarations } as never]
                     : undefined,
-                // When enabled, ask Gemini to surface thought summaries.
-                // When disabled, explicitly zero the thinking budget so the
-                // model skips thinking entirely (saves tokens and latency
-                // for bulk extraction jobs).
+                // When enabled, ask Gemini to surface thought summaries
+                // and dial the depth via `thinkingLevel` (Gemini 3 native
+                // knob — "low" | "medium" | "high"). When disabled,
+                // explicitly zero the thinking budget so the model skips
+                // thinking entirely (saves tokens and latency for bulk
+                // extraction jobs).
                 thinkingConfig: enableThinking
-                    ? { includeThoughts: true }
+                    ? { includeThoughts: true, thinkingLevel }
                     : { thinkingBudget: 0 },
             },
         });

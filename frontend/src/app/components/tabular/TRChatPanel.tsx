@@ -28,7 +28,11 @@ import type {
     ColumnConfig,
     MikeDocument,
 } from "../shared/types";
-import { ModelToggle } from "../assistant/ModelToggle";
+import {
+    ModelToggle,
+    DEFAULT_REASONING_EFFORT,
+    type ReasoningEffort,
+} from "../assistant/ModelToggle";
 import { ApiKeyMissingModal } from "../shared/ApiKeyMissingModal";
 import { PreResponseWrapper } from "../shared/PreResponseWrapper";
 import { useUserProfile } from "@/contexts/UserProfileContext";
@@ -446,6 +450,8 @@ function TRChatInput({
     onCancel,
     model,
     onModelChange,
+    effort,
+    onEffortChange,
     apiKeys,
 }: {
     isLoading: boolean;
@@ -453,6 +459,8 @@ function TRChatInput({
     onCancel: () => void;
     model: string;
     onModelChange: (id: string) => void;
+    effort: ReasoningEffort;
+    onEffortChange: (effort: ReasoningEffort) => void;
     apiKeys: {
         claudeApiKey: string | null;
         geminiApiKey: string | null;
@@ -506,6 +514,8 @@ function TRChatInput({
                     <ModelToggle
                         value={model}
                         onChange={onModelChange}
+                        effort={effort}
+                        onEffortChange={onEffortChange}
                         apiKeys={apiKeys}
                     />
                     <button
@@ -617,7 +627,8 @@ export function TRChatPanel({
     initialChatId,
     onChatIdChange,
 }: Props) {
-    const { profile, updateModelPreference } = useUserProfile();
+    const { profile, updateModelPreference, updateReasoningEffort } =
+        useUserProfile();
     const apiKeys = {
         claudeApiKey: profile?.claudeApiKey ?? null,
         geminiApiKey: profile?.geminiApiKey ?? null,
@@ -625,7 +636,17 @@ export function TRChatPanel({
         mistralApiKey: profile?.mistralApiKey ?? null,
         serverKeys: profile?.serverKeys,
     };
-    const currentModel = profile?.tabularModel ?? "gemini-3-flash-preview";
+    const currentModel = profile?.tabularModel ?? "claude-sonnet-4-6";
+    // Reuse the same per-user reasoning_effort as the main composer
+    // (DB-backed since migration 113). The TR /chat endpoint doesn't
+    // yet forward effort to the provider, but storing here keeps the
+    // picker in sync across surfaces and means the moment that
+    // endpoint is wired up nothing else has to change client-side.
+    const trEffort: ReasoningEffort =
+        profile?.reasoningEffort ?? DEFAULT_REASONING_EFFORT;
+    const setTrEffort = (next: ReasoningEffort) => {
+        void updateReasoningEffort(next);
+    };
     const [apiKeyModalProvider, setApiKeyModalProvider] =
         useState<ModelProvider | null>(null);
     const [chats, setChats] = useState<TRChat[]>([]);
@@ -1471,6 +1492,8 @@ export function TRChatPanel({
                 onModelChange={(id) =>
                     updateModelPreference("tabularModel", id)
                 }
+                effort={trEffort}
+                onEffortChange={setTrEffort}
                 apiKeys={apiKeys}
             />
 

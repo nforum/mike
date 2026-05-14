@@ -6,8 +6,19 @@ import remarkMath from "remark-math";
 import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
-import { Copy, Check, ChevronDown, Download, Loader2 } from "lucide-react";
+import {
+    Copy,
+    Check,
+    ChevronDown,
+    Download,
+    Loader2,
+    Share2,
+    Printer,
+    FileDown,
+    Flag,
+} from "lucide-react";
 import { MikeIcon } from "@/components/chat/mike-icon";
+import { setMessageFlag } from "@/app/lib/mikeApi";
 import { displayCitationQuote, formatCitationPage } from "../shared/types";
 import type {
     AssistantEvent,
@@ -511,6 +522,110 @@ function McpToolResultBlock({
                             {output || t("empty")}
                         </pre>
                     </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function WebSearchBlock({
+    query,
+    provider,
+    results,
+    error,
+    isStreaming,
+    showConnector,
+    t,
+}: {
+    query: string;
+    provider: string;
+    results: {
+        title: string;
+        url: string;
+        snippet: string;
+        published_date: string | null;
+    }[];
+    error: string | null;
+    isStreaming?: boolean;
+    showConnector?: boolean;
+    t: TFunc;
+}) {
+    const [expanded, setExpanded] = useState(false);
+    const hasError = !isStreaming && !!error;
+    const count = results.length;
+    const label = isStreaming
+        ? t("webSearchSearching")
+        : hasError
+            ? t("webSearchFailed")
+            : t("webSearchFound", { count });
+    const dotClass = isStreaming
+        ? ""
+        : hasError
+            ? "bg-red-400"
+            : count > 0
+                ? "bg-green-400"
+                : "bg-gray-300";
+    return (
+        <div className="text-sm font-serif text-gray-500 relative">
+            {showConnector && (
+                <div className="absolute bottom-0 w-[1px] bg-gray-300 top-[13px] left-[2.5px] h-[calc(100%+11px)]" />
+            )}
+            <div className="flex items-start">
+                {isStreaming ? (
+                    <div className="mt-2 w-1.5 h-1.5 rounded-full border border-gray-400 border-t-transparent animate-spin shrink-0" />
+                ) : (
+                    <div className={`mt-2 w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`} />
+                )}
+                <button
+                    type="button"
+                    onClick={() => !isStreaming && setExpanded((v) => !v)}
+                    disabled={isStreaming || (count === 0 && !hasError)}
+                    className="ml-2 min-w-0 flex-1 text-left hover:text-gray-700 transition-colors disabled:cursor-default disabled:hover:text-gray-500"
+                >
+                    <span className="font-medium">{label}</span>{" "}
+                    <span>
+                        &ldquo;{query}&rdquo;
+                        <span className="ml-1 text-gray-400">
+                            {t("webSearchVia", { provider })}
+                        </span>
+                        {isStreaming && "..."}
+                    </span>
+                    {!isStreaming && count > 0 && (
+                        <span className="ml-2 text-xs text-gray-400">
+                            {expanded ? t("hideDetails") : t("showDetails")}
+                        </span>
+                    )}
+                </button>
+            </div>
+            {expanded && !isStreaming && (
+                <div className="ml-3.5 mt-2 border-l-2 border-gray-200 pl-3 space-y-2">
+                    {hasError && (
+                        <div className="text-xs text-red-500 break-words">
+                            {error}
+                        </div>
+                    )}
+                    {results.map((r, idx) => (
+                        <a
+                            key={`${r.url}-${idx}`}
+                            href={r.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block rounded border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors p-2"
+                        >
+                            <div className="text-[13px] font-medium text-blue-600 hover:underline truncate">
+                                {r.title || r.url}
+                            </div>
+                            <div className="text-[11px] text-gray-500 truncate">
+                                {r.url}
+                                {r.published_date ? ` · ${r.published_date}` : ""}
+                            </div>
+                            {r.snippet && (
+                                <div className="text-[12px] text-gray-600 mt-1 line-clamp-2">
+                                    {r.snippet}
+                                </div>
+                            )}
+                        </a>
+                    ))}
                 </div>
             )}
         </div>
@@ -1160,6 +1275,29 @@ interface Props {
      * edits flip their per-card UI without per-card clicks.
      */
     resolvedEditStatuses?: Record<string, "accepted" | "rejected">;
+    /**
+     * When true, an inline Share button is rendered next to the Copy
+     * button at the bottom of this message. The parent only sets this on
+     * the last assistant message in the thread so we don't clutter
+     * every reply with a Share affordance.
+     */
+    isLast?: boolean;
+    onShareClick?: () => void;
+    /**
+     * Server-assigned chat_messages.id for the rendered assistant turn.
+     * When present, the bottom toolbar shows the Print, Export PDF, and
+     * Flag affordances. While the message is still streaming or has no
+     * id yet (fresh assistant placeholder), those buttons stay hidden.
+     */
+    messageId?: string;
+    /** Initial state of the "not appropriate answer" flag for this message. */
+    flagged?: boolean;
+    /**
+     * Optional notifier — parents may want to sync the flag state into
+     * their own message list (e.g. to persist it across re-renders or
+     * push it into a separate analytics store).
+     */
+    onFlagChange?: (messageId: string, flagged: boolean) => void;
 }
 
 export function AssistantMessage({
@@ -1180,11 +1318,28 @@ export function AssistantMessage({
     isDocReloading,
     isEditReloading,
     resolvedEditStatuses,
+    isLast = false,
+    onShareClick,
+    messageId,
+    flagged = false,
+    onFlagChange,
 }: Props) {
     const messageKey = useId();
     const t = useTranslations("streaming");
+    const tShare = useTranslations("shareChat");
+    const tCommon = useTranslations("common");
+    const tActions = useTranslations("messageActions");
     const contentDivRef = useRef<HTMLDivElement | null>(null);
     const [isCopied, setIsCopied] = useState(false);
+    const [isFlagged, setIsFlagged] = useState<boolean>(flagged);
+    const [flagBusy, setFlagBusy] = useState(false);
+    const [exporting, setExporting] = useState(false);
+    // Keep local flag state in sync if the parent toggles `flagged` from
+    // outside (e.g. after a refetch). We don't override mid-request so an
+    // in-flight optimistic update doesn't flicker back to the old state.
+    useEffect(() => {
+        if (!flagBusy) setIsFlagged(flagged);
+    }, [flagged, flagBusy]);
     // Per-document override of the download URL, set as Accept/Reject resolves
     // each tracked change and produces a new version.
     const [resolvedOverrides, setResolvedOverrides] = useState<
@@ -1252,6 +1407,322 @@ export function AssistantMessage({
             setTimeout(() => setIsCopied(false), 2000);
         } catch {
             // ignore
+        }
+    };
+
+    /**
+     * Build a standalone, print-ready HTML document for the rendered
+     * assistant answer. Wraps the rendered markdown in an Eulex-branded
+     * layout (max.eulex.ai header + "Powered by Eulex.ai" footer with a
+     * marketing tagline) so the resulting print/PDF carries the firm's
+     * identity. Used by both Print and Export-to-PDF — the difference is
+     * just whether the user picks "Print" or "Save as PDF" in the
+     * system dialog the browser opens.
+     */
+    const buildPrintableHtml = (): string | null => {
+        if (!contentDivRef.current) return null;
+        const clone = contentDivRef.current.cloneNode(true) as HTMLElement;
+        const innerHtml = clone.innerHTML;
+        const now = new Date();
+        const dateStr = now.toLocaleString();
+        // Sanitise the marketing tagline so a literal closing brace in
+        // CSS `content: "..."` doesn't break parsing.
+        const tagline = tActions("marketingTagline").replace(/"/g, '\\"');
+        return `<!doctype html>
+<html lang="hr">
+<head>
+<meta charset="utf-8" />
+<title>max.eulex.ai — ${tActions("documentTitle")}</title>
+<style>
+  /* Print layout: reserve room at the top + bottom of every A4 page
+     for our repeating margin-boxes. Chromium/WebKit honour @page margin
+     boxes (top-left/right, bottom-center/right) so we don't have to fake
+     repeating headers with position:fixed — which is what was causing
+     the watermark and footer to overlap the body text. */
+  @page {
+    size: A4;
+    margin: 22mm 18mm 22mm 18mm;
+    @top-left {
+      content: "max.eulex.ai";
+      font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+      font-size: 8pt;
+      letter-spacing: 1px;
+      color: #94A3B8;
+      text-transform: lowercase;
+    }
+    @top-right {
+      content: "${tActions("watermark").replace(/"/g, '\\"')}";
+      font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+      font-size: 7pt;
+      letter-spacing: 2px;
+      color: #CBD5E1;
+      text-transform: uppercase;
+    }
+    @bottom-left {
+      content: "Powered by Eulex.ai — ${tagline}";
+      font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+      font-size: 8pt;
+      color: #475569;
+    }
+    @bottom-right {
+      content: "Stranica " counter(page) " / " counter(pages);
+      font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+      font-size: 8pt;
+      color: #94A3B8;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    color: #111827;
+    line-height: 1.6;
+    font-size: 11.5pt;
+  }
+  /* Cover block on page 1 only — formal letterhead. */
+  .doc-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    border-bottom: 1.5px solid #0F172A;
+    padding-bottom: 10px;
+    margin-bottom: 18px;
+  }
+  .doc-header .brand {
+    font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 600;
+    font-size: 13pt;
+    letter-spacing: 0.3px;
+    color: #0F172A;
+  }
+  .doc-header .brand .domain { color: #1D4ED8; font-weight: 700; }
+  .doc-header .doc-meta {
+    font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 8.5pt;
+    color: #64748B;
+    text-align: right;
+    line-height: 1.4;
+  }
+  .doc-meta .label { text-transform: uppercase; letter-spacing: 1.5px; font-size: 7.5pt; color: #94A3B8; }
+
+  h1, h2, h3, h4 {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    color: #0F172A;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+  h1 { font-size: 20pt; margin: 18px 0 10px; line-height: 1.25; }
+  h2 { font-size: 15pt; margin: 18px 0 8px; line-height: 1.3; }
+  h3 { font-size: 12.5pt; margin: 14px 0 6px; line-height: 1.35; }
+  h4 { font-size: 11.5pt; margin: 12px 0 6px; font-weight: 600; }
+  p  { margin: 0 0 9px; orphans: 3; widows: 3; }
+  ul, ol { margin: 4px 0 12px 22px; padding: 0; }
+  li { margin-bottom: 4px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  th, td {
+    border: 1px solid #E2E8F0;
+    padding: 7px 9px;
+    text-align: left;
+    font-size: 10.5pt;
+    vertical-align: top;
+  }
+  th { background: #F8FAFC; font-family: 'Inter', sans-serif; font-weight: 600; }
+  blockquote {
+    border-left: 3px solid #CBD5E1;
+    padding-left: 12px;
+    color: #475569;
+    margin: 10px 0;
+    font-style: italic;
+  }
+  code { background: #F1F5F9; padding: 1px 4px; border-radius: 3px; font-size: 10.5pt; }
+  pre  {
+    background: #F1F5F9;
+    padding: 10px;
+    border-radius: 4px;
+    overflow: auto;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  a { color: #1D4ED8; text-decoration: underline; }
+
+  /* Strip any rendered inline UI controls Max embeds in the live answer
+     (citation pills, etc.) — they shouldn't reach the printout. */
+  button { display: none !important; }
+
+  /* Closing card with the disclaimer. Tries to stay on the same page as
+     the last paragraph, but allows a break before if there isn't room. */
+  .doc-disclaimer {
+    margin-top: 24px;
+    padding-top: 10px;
+    border-top: 1px solid #E2E8F0;
+    font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 8.5pt;
+    color: #64748B;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .doc-disclaimer .powered {
+    display: block;
+    color: #0F172A;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .doc-disclaimer .powered .accent { color: #1D4ED8; }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+  <header class="doc-header">
+    <div class="brand">
+      <span class="domain">max.eulex.ai</span> &middot; ${tActions("brandLabel")}
+    </div>
+    <div class="doc-meta">
+      <div class="label">${tActions("generatedOn")}</div>
+      <div>${dateStr}</div>
+    </div>
+  </header>
+  <main class="doc-content prose">
+    ${innerHtml}
+  </main>
+  <footer class="doc-disclaimer">
+    <span class="powered">Powered by <span class="accent">Eulex.ai</span> — ${tActions("marketingTagline")}</span>
+    ${tActions("disclaimer")}
+  </footer>
+</body>
+</html>`;
+    };
+
+    /**
+     * Opens a hidden iframe containing the branded answer and triggers
+     * the browser's print dialog. From there the user can pick "Save as
+     * PDF" (Export) or any installed printer (Print). Using an iframe
+     * instead of window.print() on the current page keeps the surrounding
+     * Max UI out of the printout.
+     *
+     * The spinner is cleared as soon as the print dialog opens (or 1.5s
+     * after, whichever comes first) — the modal print dialog blocks the
+     * UI anyway, so a perpetual spinner just confuses users into thinking
+     * the export is still in progress.
+     */
+    const openPrintWindow = (action: "print" | "pdf") => {
+        const html = buildPrintableHtml();
+        if (!html) return;
+        if (action === "pdf") setExporting(true);
+        const iframe = document.createElement("iframe");
+        iframe.style.position = "fixed";
+        iframe.style.right = "0";
+        iframe.style.bottom = "0";
+        iframe.style.width = "0";
+        iframe.style.height = "0";
+        iframe.style.border = "0";
+        iframe.style.visibility = "hidden";
+        document.body.appendChild(iframe);
+
+        let cleaned = false;
+        const cleanup = () => {
+            if (cleaned) return;
+            cleaned = true;
+            try {
+                document.body.removeChild(iframe);
+            } catch {
+                /* ignore */
+            }
+            if (action === "pdf") setExporting(false);
+        };
+        // Spinner only signals "preparing the print preview" — once the
+        // browser shows the print dialog the UI is blocked, so clearing
+        // the spinner shortly after triggering keeps the toolbar honest.
+        const clearSpinnerSoon = () => {
+            if (action === "pdf") setExporting(false);
+        };
+
+        try {
+            const doc =
+                iframe.contentDocument ?? iframe.contentWindow?.document;
+            if (!doc) {
+                cleanup();
+                return;
+            }
+            doc.open();
+            doc.write(html);
+            doc.close();
+
+            const win = iframe.contentWindow;
+            const triggerPrint = () => {
+                try {
+                    win?.focus();
+                    win?.print();
+                } catch (err) {
+                    console.error(
+                        "[AssistantMessage] iframe.print() failed",
+                        err,
+                    );
+                }
+                // The print dialog is open (or was dismissed instantly
+                // by an extension); either way the user no longer needs
+                // a spinner.
+                clearSpinnerSoon();
+            };
+
+            // `afterprint` fires when the user dismisses the dialog
+            // (Save / Cancel). At that point the iframe has served its
+            // purpose — drop it from the DOM.
+            win?.addEventListener("afterprint", () => {
+                setTimeout(cleanup, 100);
+            });
+
+            // Wait for the iframe's load event before printing so
+            // fonts/images render. Fall back to a short delay if `load`
+            // never fires (some browsers skip it for doc.write streams).
+            let printed = false;
+            const printOnce = () => {
+                if (printed) return;
+                printed = true;
+                triggerPrint();
+            };
+            win?.addEventListener("load", printOnce);
+            setTimeout(printOnce, 350);
+
+            // Safety net — if the user never closes the print dialog
+            // (or `afterprint` is suppressed by the browser), drop the
+            // iframe + spinner after a generous window so we don't leak.
+            setTimeout(() => {
+                clearSpinnerSoon();
+                cleanup();
+            }, 60_000);
+        } catch (err) {
+            console.error("[AssistantMessage] print failed", err);
+            cleanup();
+        }
+    };
+
+    const handlePrint = () => openPrintWindow("print");
+    const handleExportPdf = () => openPrintWindow("pdf");
+
+    const handleToggleFlag = async () => {
+        if (!messageId || flagBusy) return;
+        const next = !isFlagged;
+        setFlagBusy(true);
+        setIsFlagged(next);
+        try {
+            const resp = await setMessageFlag(messageId, next);
+            const persisted = !!resp.is_flagged;
+            setIsFlagged(persisted);
+            onFlagChange?.(messageId, persisted);
+        } catch (err) {
+            console.error("[AssistantMessage] flag toggle failed", err);
+            setIsFlagged(!next);
+        } finally {
+            setFlagBusy(false);
         }
     };
 
@@ -1370,6 +1841,28 @@ export function AssistantMessage({
                     <div className="w-1.5 h-1.5 rounded-full border border-gray-400 border-t-transparent animate-spin shrink-0" />
                     <span className="ml-2">{t("thinking")}</span>
                 </div>
+            );
+        }
+        if (
+            event.type === "web_search_started" ||
+            event.type === "web_search_result"
+        ) {
+            const isStreaming = event.type === "web_search_started";
+            const results =
+                event.type === "web_search_result" ? event.results : [];
+            const error =
+                event.type === "web_search_result" ? event.error : null;
+            return (
+                <WebSearchBlock
+                    key={globalIdx}
+                    query={event.query}
+                    provider={event.provider}
+                    results={results}
+                    error={error}
+                    isStreaming={isStreaming}
+                    showConnector={showConnector}
+                    t={t}
+                />
             );
         }
         if (event.type === "doc_read") {
@@ -1736,18 +2229,87 @@ export function AssistantMessage({
                         </div>
                     )}
 
-                {/* Copy button */}
-                <div className="flex items-center gap-2 pt-2 pb-4 md:pb-8 font-sans justify-start">
+                {/* Toolbar — Copy / Print / Export PDF / Flag / Share.
+                    Print + Export PDF render the assistant answer through
+                    a hidden iframe with the max.eulex.ai branded layout;
+                    Flag toggles chat_messages.is_flagged via the API. The
+                    Share button still appears only on the last assistant
+                    reply so the affordance is consistently anchored. */}
+                <div className="flex items-center gap-1 pt-2 pb-4 md:pb-8 font-sans justify-start">
                     {!isStreaming && (
                         <button
                             className="p-1.5 rounded text-gray-500 hover:text-gray-700 hover:bg-gray-100"
                             onClick={handleCopy}
+                            title={
+                                isCopied
+                                    ? tCommon("copied")
+                                    : tCommon("copy")
+                            }
+                            aria-label={tCommon("copy")}
                         >
                             {isCopied ? (
                                 <Check className="h-3.5 w-3.5 text-green-600" />
                             ) : (
                                 <Copy className="h-3.5 w-3.5" />
                             )}
+                        </button>
+                    )}
+                    {!isStreaming && (
+                        <button
+                            className="p-1.5 rounded text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                            onClick={handlePrint}
+                            title={tActions("print")}
+                            aria-label={tActions("print")}
+                        >
+                            <Printer className="h-3.5 w-3.5" />
+                        </button>
+                    )}
+                    {!isStreaming && (
+                        <button
+                            className="p-1.5 rounded text-gray-500 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                            onClick={handleExportPdf}
+                            disabled={exporting}
+                            title={tActions("exportPdf")}
+                            aria-label={tActions("exportPdf")}
+                        >
+                            {exporting ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                                <FileDown className="h-3.5 w-3.5" />
+                            )}
+                        </button>
+                    )}
+                    {!isStreaming && messageId && (
+                        <button
+                            className={`p-1.5 rounded transition-colors disabled:opacity-50 ${
+                                isFlagged
+                                    ? "text-red-600 hover:bg-red-50"
+                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                            }`}
+                            onClick={handleToggleFlag}
+                            disabled={flagBusy}
+                            title={tActions("flagTooltip")}
+                            aria-label={tActions("flagTooltip")}
+                            aria-pressed={isFlagged}
+                        >
+                            {flagBusy ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                                <Flag
+                                    className="h-3.5 w-3.5"
+                                    fill={isFlagged ? "currentColor" : "none"}
+                                />
+                            )}
+                        </button>
+                    )}
+                    {!isStreaming && isLast && onShareClick && (
+                        <button
+                            className="p-1.5 rounded text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                            onClick={onShareClick}
+                            title={tShare("title")}
+                            aria-label={tShare("title")}
+                        >
+                            <Share2 className="h-3.5 w-3.5" />
                         </button>
                     )}
                 </div>

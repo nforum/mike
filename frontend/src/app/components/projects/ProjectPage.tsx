@@ -64,7 +64,7 @@ import { UploadNewVersionModal } from "@/app/components/shared/UploadNewVersionM
 import { DocViewModal } from "@/app/components/shared/DocViewModal";
 import { AddNewTRModal } from "@/app/components/tabular/AddNewTRModal";
 import { useChatHistoryContext } from "@/app/contexts/ChatHistoryContext";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 interface Props {
     projectId: string;
@@ -88,8 +88,9 @@ function formatBytes(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function formatDate(iso: string) {
-    return new Date(iso).toLocaleDateString(undefined, {
+function formatDate(iso: string, locale?: string) {
+    const bcp47 = locale === "hr" ? "hr-HR" : locale;
+    return new Date(iso).toLocaleDateString(bcp47, {
         day: "numeric",
         month: "short",
         year: "numeric",
@@ -276,6 +277,7 @@ function DocVersionHistory({
 export function ProjectPage({ projectId }: Props) {
     const tProject = useTranslations("projectPage");
     const tDelete = useTranslations("confirmDelete");
+    const locale = useLocale();
     const { confirm: confirmDialog, dialog: confirmDialogEl } =
         useConfirmDialog();
     const [project, setProject] = useState<MikeProject | null>(null);
@@ -885,7 +887,7 @@ export function ProjectPage({ projectId }: Props) {
                         <input
                             autoFocus
                             className="flex-1 min-w-0 text-sm text-gray-800 bg-transparent outline-none border-b border-gray-300"
-                            placeholder="Folder name"
+                            placeholder={tProject("folderName")}
                             value={newFolderName}
                             onChange={(e) => setNewFolderName(e.target.value)}
                             onKeyDown={(e) => {
@@ -999,10 +1001,10 @@ export function ProjectPage({ projectId }: Props) {
                                     )}
                                 </div>
                                 <div className="w-32 shrink-0 text-sm text-gray-500 truncate">
-                                    {doc.created_at ? formatDate(doc.created_at) : <span className="text-gray-300">—</span>}
+                                    {doc.created_at ? formatDate(doc.created_at, locale) : <span className="text-gray-300">—</span>}
                                 </div>
                                 <div className="w-32 shrink-0 text-sm text-gray-500 truncate">
-                                    {doc.updated_at ? formatDate(doc.updated_at) : <span className="text-gray-300">—</span>}
+                                    {doc.updated_at ? formatDate(doc.updated_at, locale) : <span className="text-gray-300">—</span>}
                                 </div>
                                 <div className="w-8 shrink-0 flex justify-end">
                                     {!isProcessing && (
@@ -1248,14 +1250,14 @@ export function ProjectPage({ projectId }: Props) {
                         className="flex items-center gap-1 text-xs px-3 font-medium text-gray-500 hover:text-gray-700 transition-colors"
                     >
                         <FolderPlus className="h-3.5 w-3.5" />
-                        Add Subfolder
+                        {tProject("addSubfolder")}
                     </button>
                     <button
                         onClick={() => setAddDocsOpen(true)}
                         className="flex items-center gap-1 text-xs px-3 font-medium text-gray-500 hover:text-gray-700 transition-colors"
                     >
                         <Upload className="h-3.5 w-3.5" />
-                        Add Documents
+                        {tProject("addDocuments")}
                     </button>
                 </>
             )}
@@ -1375,13 +1377,13 @@ export function ProjectPage({ projectId }: Props) {
                                 />
                             </div>
                             <div className={`sticky left-8 z-[60] ${NAME_COL_W} bg-white pl-2 text-left`}>
-                                Name
+                                {tProject("name")}
                             </div>
-                            <div className="ml-auto w-20 shrink-0 text-left">Type</div>
-                            <div className="w-24 shrink-0 text-left">Size</div>
-                            <div className="w-20 shrink-0 text-left">Version</div>
-                            <div className="w-32 shrink-0 text-left">Created</div>
-                            <div className="w-32 shrink-0 text-left">Updated</div>
+                            <div className="ml-auto w-20 shrink-0 text-left">{tProject("type")}</div>
+                            <div className="w-24 shrink-0 text-left">{tProject("size")}</div>
+                            <div className="w-20 shrink-0 text-left">{tProject("version")}</div>
+                            <div className="w-32 shrink-0 text-left">{tProject("created")}</div>
+                            <div className="w-32 shrink-0 text-left">{tProject("updated")}</div>
                             <div className="w-8 shrink-0" />
                         </div>
 
@@ -1476,10 +1478,10 @@ export function ProjectPage({ projectId }: Props) {
                                                         )}
                                                     </div>
                                                     <div className="w-32 shrink-0 text-sm text-gray-500 truncate">
-                                                        {doc.created_at ? formatDate(doc.created_at) : <span className="text-gray-300">—</span>}
+                                                        {doc.created_at ? formatDate(doc.created_at, locale) : <span className="text-gray-300">—</span>}
                                                     </div>
                                                     <div className="w-32 shrink-0 text-sm text-gray-500 truncate">
-                                                        {doc.updated_at ? formatDate(doc.updated_at) : <span className="text-gray-300">—</span>}
+                                                        {doc.updated_at ? formatDate(doc.updated_at, locale) : <span className="text-gray-300">—</span>}
                                                     </div>
                                                     <div className="w-8 shrink-0 flex justify-end">
                                                         {!isProcessing && (
@@ -1543,7 +1545,7 @@ export function ProjectPage({ projectId }: Props) {
                                     }}
                                 >
                                     <FolderPlus className="h-3.5 w-3.5 text-gray-400" />
-                                    {contextMenu.showFolderActions ? "New subfolder inside" : "New subfolder"}
+                                    {contextMenu.showFolderActions ? tProject("newSubfolderInside") : tProject("newSubfolder")}
                                 </button>
                                 {contextMenu.showFolderActions && contextMenu.folderId && (
                                     <>
@@ -1556,7 +1558,7 @@ export function ProjectPage({ projectId }: Props) {
                                                 setContextMenu(null);
                                             }}
                                         >
-                                            Rename folder
+                                            {tProject("renameFolder")}
                                         </button>
                                         <button
                                             className="w-full px-3 py-1.5 text-left text-red-600 hover:bg-red-50"
@@ -1565,7 +1567,7 @@ export function ProjectPage({ projectId }: Props) {
                                                 setContextMenu(null);
                                             }}
                                         >
-                                            Delete folder
+                                            {tProject("deleteFolder")}
                                         </button>
                                     </>
                                 )}
@@ -1625,7 +1627,7 @@ export function ProjectPage({ projectId }: Props) {
                                                 <span className="text-sm text-gray-800 truncate block">{chat.title ?? tProject("untitledChat")}</span>
                                             )}
                                         </div>
-                                        <div className="ml-auto w-32 shrink-0 text-sm text-gray-500 truncate">{formatDate(chat.created_at)}</div>
+                                        <div className="ml-auto w-32 shrink-0 text-sm text-gray-500 truncate">{formatDate(chat.created_at, locale)}</div>
                                         <div className="w-8 shrink-0 flex justify-end" onClick={(e) => e.stopPropagation()}>
                                             <RowActions
                                                 onRename={() => {
@@ -1716,7 +1718,7 @@ export function ProjectPage({ projectId }: Props) {
                                         </div>
                                         <div className="ml-auto w-24 shrink-0 text-sm text-gray-500 truncate">{review.columns_config?.length ?? 0}</div>
                                         <div className="w-24 shrink-0 text-sm text-gray-500 truncate">{review.document_count ?? 0}</div>
-                                        <div className="w-32 shrink-0 text-sm text-gray-500 truncate">{review.created_at ? formatDate(review.created_at) : <span className="text-gray-300">—</span>}</div>
+                                        <div className="w-32 shrink-0 text-sm text-gray-500 truncate">{review.created_at ? formatDate(review.created_at, locale) : <span className="text-gray-300">—</span>}</div>
                                         <div className="w-8 shrink-0 flex justify-end" onClick={(e) => e.stopPropagation()}>
                                             <RowActions
                                                 onRename={() => {
@@ -1760,7 +1762,7 @@ export function ProjectPage({ projectId }: Props) {
                 open={addDocsOpen}
                 onClose={() => setAddDocsOpen(false)}
                 onSelect={handleDocsSelected}
-                breadcrumb={["Projects", project.name + (project.cm_number ? ` (${project.cm_number})` : ""), "Add Documents"]}
+                breadcrumb={[tProject("projects"), project.name + (project.cm_number ? ` (${project.cm_number})` : ""), tProject("addDocuments")]}
                 projectId={projectId}
             />
 

@@ -28,7 +28,7 @@ REGION="${REGION:-europe-west1}"
 BUILD_REGION="${BUILD_REGION:-europe-west1}"
 FRONTEND_SERVICE="${FRONTEND_SERVICE:-mike-frontend}"
 BACKEND_SERVICE="${BACKEND_SERVICE:-mike-backend}"
-FRONTEND_URL="${FRONTEND_URL:-https://mike-frontend-cc6nrgescq-ew.a.run.app}"
+FRONTEND_URL="${FRONTEND_URL:-https://max.eulex.ai}"
 BACKEND_URL="${BACKEND_URL:-https://mike-backend-cc6nrgescq-ew.a.run.app}"
 
 # Limit the run to a single service if the user passes "frontend" or "backend".
@@ -88,11 +88,14 @@ EOF
     trap 'rm -f frontend/.env.production' EXIT
 
     log "Frontend: gcloud run deploy --source frontend (build env NEXT_PUBLIC_*)"
+    # --min-instances=1: keep one warm so first hit after idle doesn't
+    # pay a Next.js SSR cold-start. ~$3-5/mo for a 2-user app.
     gcloud run deploy "$FRONTEND_SERVICE" \
         --source frontend \
         --region "$REGION" \
         --project "$PROJECT_ID" \
         --set-build-env-vars "NEXT_PUBLIC_API_BASE_URL=${BACKEND_URL},NEXT_PUBLIC_BACKEND_URL=${BACKEND_URL}" \
+        --min-instances=1 \
         --quiet
 
     rm -f frontend/.env.production
@@ -100,12 +103,56 @@ EOF
 }
 
 deploy_backend() {
+    # mike/mcp.json lives outside the backend build context. We have to
+    # stage it into backend/mike/ so the Dockerfile's `COPY mike ./mike`
+    # can include it in the image. Trap on EXIT removes the staged copy
+    # whether the deploy succeeds or fails, so the working tree stays
+    # clean and backend/mike/ never accidentally gets committed.
+    log "Backend: stage mike/mcp.json into backend/mike/"
+    if [ ! -f mike/mcp.json ]; then
+        echo "ERROR: mike/mcp.json not found at $ROOT/mike/mcp.json" >&2
+        exit 1
+    fi
+    mkdir -p backend/mike
+    cp mike/mcp.json backend/mike/mcp.json
+    trap 'rm -rf backend/mike' EXIT
+
     log "Backend: gcloud run deploy --source backend"
+    # Server-side secrets injected from Secret Manager. Idempotent via
+    # --update-secrets so re-deploys never drop a binding.
+    #   * MAX_EULEX_PARTNER_SECRET  → backend/src/lib/mcp/partnerJwt.ts
+    #   * ANTHROPIC_API_KEY         → backend/src/lib/userSettings.ts
+    #     (server-level Claude key fallback for default Claude Sonnet 4.6)
+    #   * ADMIN_MAX_PASSWORD        → backend/src/routes/adminMax.ts (login gate)
+    #   * ADMIN_MAX_JWT_SECRET      → backend/src/middleware/adminMaxAuth.ts
+    #     (HS256 admin token signing key — kept separate from EULEX_MCP_JWT_SECRET)
+    # Backend deploy flags:
+    #   --timeout=1200       — long extended-thinking chats; see chat.ts heartbeat.
+    #   --memory=2Gi         — headroom for big PDFs + MCP streams + thinking.
+    #   --no-traffic         — blue-green: keep old revision serving in-flight
+    #                          SSE until the next step flips the live endpoint.
     gcloud run deploy "$BACKEND_SERVICE" \
         --source backend \
         --region "$REGION" \
         --project "$PROJECT_ID" \
+        --update-secrets "MAX_EULEX_PARTNER_SECRET=MAX_EULEX_PARTNER_SECRET:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest,ADMIN_MAX_PASSWORD=ADMIN_MAX_PASSWORD:latest,ADMIN_MAX_JWT_SECRET=adminmax-jwt-secret:latest,TAVILY_API_KEY=tavily-api-key:latest" \
+        --timeout=1200 \
+        --memory=2Gi \
+        --no-traffic \
         --quiet
+
+    # Atomic flip to the new revision. Old revisions keep serving any open
+    # streams until they drain naturally — no SIGTERM in the middle of an
+    # answer.
+    log "Backend: promote latest revision to 100% traffic"
+    gcloud run services update-traffic "$BACKEND_SERVICE" \
+        --to-latest \
+        --region "$REGION" \
+        --project "$PROJECT_ID" \
+        --quiet
+
+    rm -rf backend/mike
+    trap - EXIT
 }
 
 case "$TARGET" in

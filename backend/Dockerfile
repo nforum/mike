@@ -38,6 +38,13 @@ RUN npm ci --omit=dev --ignore-scripts
 # Compiled JS from builder stage
 COPY --from=builder /app/dist ./dist
 
+# Built-in MCP connector config (mike/mcp.json). The repo's mike/ folder
+# lives outside the backend build context, so cloudbuild.yaml and
+# scripts/deploy.sh stage a copy at backend/mike/ before invoking the
+# Docker build. The loader (lib/mcp/builtin.ts) checks /app/mike/mcp.json
+# as one of its candidate paths.
+COPY mike ./mike
+
 # Cloud Run injects PORT env var (default 8080)
 ENV PORT=8080
 ENV NODE_ENV=production

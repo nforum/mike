@@ -11,6 +11,7 @@ import {
     type ChatMessage,
 } from "../lib/chatTools";
 import { completeText } from "../lib/llm";
+import { recordLlmUsage } from "../lib/llmUsage";
 import { getUserApiKeys, getUserModelSettings } from "../lib/userSettings";
 import { checkProjectAccess } from "../lib/access";
 import {
@@ -285,6 +286,96 @@ chatRouter.delete("/:chatId", requireAuth, async (req, res) => {
     res.status(204).send();
 });
 
+// POST /chat/messages/:messageId/flag
+// Toggle the "not appropriate answer" flag on an assistant message.
+//
+// Body: { flagged: boolean, reason?: string }
+//
+// Anyone with access to the parent chat (owner, project member, or
+// per-chat collaborator) may flag a message — flags reflect *the
+// requesting user's* opinion of the assistant reply, not just the
+// chat owner's, so consumers in a shared chat can all surface concerns.
+// The denormalised `is_flagged` boolean reflects the most recent
+// action; the full toggle history lives in chat_message_flags.
+chatRouter.post(
+    "/messages/:messageId/flag",
+    requireAuth,
+    async (req, res) => {
+        const userId = res.locals.userId as string;
+        const userEmail = res.locals.userEmail as string | undefined;
+        const { messageId } = req.params;
+        const flagged = !!req.body?.flagged;
+        const reasonRaw = req.body?.reason;
+        const reason =
+            typeof reasonRaw === "string" && reasonRaw.trim().length > 0
+                ? reasonRaw.trim().slice(0, 500)
+                : "not_appropriate";
+
+        const db = createServerSupabase();
+        const { data: msg, error: msgErr } = await db
+            .from("chat_messages")
+            .select("id, chat_id, role")
+            .eq("id", messageId)
+            .single();
+        if (msgErr || !msg)
+            return void res.status(404).json({ detail: "Message not found" });
+        if (msg.role !== "assistant")
+            return void res
+                .status(400)
+                .json({ detail: "Only assistant messages can be flagged" });
+
+        const { data: chat } = await db
+            .from("chats")
+            .select("id, user_id, project_id, shared_with")
+            .eq("id", msg.chat_id)
+            .single();
+        if (!chat)
+            return void res.status(404).json({ detail: "Chat not found" });
+
+        let canFlag = chat.user_id === userId;
+        if (!canFlag && chat.project_id) {
+            const access = await checkProjectAccess(
+                chat.project_id,
+                userId,
+                userEmail,
+                db,
+            );
+            canFlag = access.ok;
+        }
+        if (!canFlag && userEmail) {
+            canFlag = chatHasCollaborator(chat, userEmail);
+        }
+        if (!canFlag)
+            return void res.status(404).json({ detail: "Message not found" });
+
+        const nowIso = new Date().toISOString();
+        const { error: updErr } = await db
+            .from("chat_messages")
+            .update({
+                is_flagged: flagged,
+                flagged_at: flagged ? nowIso : null,
+                flagged_by: flagged ? userId : null,
+            })
+            .eq("id", messageId);
+        if (updErr)
+            return void res.status(500).json({ detail: updErr.message });
+
+        await db.from("chat_message_flags").insert({
+            chat_message_id: messageId,
+            chat_id: msg.chat_id,
+            user_id: userId,
+            action: flagged ? "flag" : "unflag",
+            reason: flagged ? reason : null,
+        });
+
+        res.json({
+            id: messageId,
+            is_flagged: flagged,
+            flagged_at: flagged ? nowIso : null,
+        });
+    },
+);
+
 // POST /chat/:chatId/generate-title
 chatRouter.post("/:chatId/generate-title", requireAuth, async (req, res) => {
     const userId = res.locals.userId as string;
@@ -353,6 +444,7 @@ chatRouter.post("/", requireAuth, async (req, res) => {
         chat_id,
         project_id,
         model,
+        effort,
         client,
         editMode,
     } = req.body as {
@@ -360,6 +452,11 @@ chatRouter.post("/", requireAuth, async (req, res) => {
         chat_id?: string;
         project_id?: string;
         model?: string;
+        // User-selected reasoning intensity for this turn. Validated
+        // below against the canonical "low" | "medium" | "high" set so
+        // a malformed client can't crash the provider with an invalid
+        // value.
+        effort?: string;
         // `client` lets the LLM tailor its tool-use strategy: the Word
         // add-in needs `find` strings that survive Office.js' search
         // primitive (≤200 chars, single paragraph). Defaults to "web"
@@ -372,12 +469,25 @@ chatRouter.post("/", requireAuth, async (req, res) => {
         // client picks the right Apply UI.
         editMode?: "track" | "comments";
     };
+    const reasoningEffort: "low" | "medium" | "high" | undefined =
+        effort === "low" || effort === "medium" || effort === "high"
+            ? effort
+            : undefined;
 
     console.log("[chat/stream] incoming request", {
         userId,
         chat_id,
         project_id,
         model,
+        // Effort is logged so we can verify in Cloud Run logs that the
+        // picker is actually wired through to the provider — see
+        // backend/src/lib/llm/{claude,openai,gemini}.ts where it lands
+        // in `output_config.effort` / `reasoning_effort` /
+        // `thinkingConfig.thinkingLevel`. Raw `effort` shows what the
+        // client sent; `reasoningEffort` shows what we accepted after
+        // validation.
+        effort,
+        reasoningEffort,
         client: client ?? "web",
         editMode: editMode ?? "track",
         messageCount: messages?.length,
@@ -492,21 +602,50 @@ chatRouter.post("/", requireAuth, async (req, res) => {
     res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders();
 
+    // Keep the underlying socket open for the duration of the stream.
+    // Long extended-thinking + multi-MCP runs can exceed Node's default
+    // 2-minute request socket timeout, which would surface as the browser
+    // dropping the connection mid-answer ("load failed"). 0 disables the
+    // per-request timer; the Cloud Run service-level --timeout=3600 still
+    // bounds the overall lifetime.
+    if (typeof req.setTimeout === "function") req.setTimeout(0);
+    if (typeof res.setTimeout === "function") res.setTimeout(0);
+
     const write = (line: string) => res.write(line);
+
+    // SSE keep-alive heartbeat. Comment lines (": …") are ignored by the
+    // EventSource/SSE parser but force a flush through Cloud Run's HTTP/2
+    // proxy and any intermediary caches, preventing them from closing the
+    // stream as "idle" while the LLM is in a long thinking block or
+    // between tool-call rounds. 15s is comfortably below the typical 30-60s
+    // idle thresholds without producing meaningful network overhead.
+    const heartbeat = setInterval(() => {
+        try {
+            res.write(`: keepalive ${Date.now()}\n\n`);
+        } catch {
+            /* socket already closed — interval gets cleared in finally */
+        }
+    }, 15_000);
+    // Clean up if the client navigates away before we finish.
+    req.on("close", () => clearInterval(heartbeat));
 
     const apiKeys = await getUserApiKeys(userId, db);
     // Per-user connectors come first so they win any slug collision in
     // findMcpServerForTool; built-in (system-side) MCPs follow.
     const [userMcpServers, builtinMcpServers] = await Promise.all([
         loadEnabledMcpServersForUser(userId, db),
-        loadBuiltinMcpServers(),
+        loadBuiltinMcpServers(userId, db),
     ]);
     const mcpServers = [...userMcpServers, ...builtinMcpServers];
+
+    // Wall-clock timer for cost telemetry — see recordLlmUsage call below.
+    const turnStartedAt = Date.now();
+    let usageRecorded = false;
 
     try {
         write(`data: ${JSON.stringify({ type: "chat_id", chatId })}\n\n`);
 
-        const { fullText, events } = await runLLMStream({
+        const { fullText, events, usage, selectedModel } = await runLLMStream({
             apiMessages,
             docStore,
             docIndex,
@@ -515,6 +654,7 @@ chatRouter.post("/", requireAuth, async (req, res) => {
             write,
             workflowStore,
             model,
+            reasoningEffort,
             apiKeys,
             projectId: project_id ?? null,
             mcpServers,
@@ -528,12 +668,45 @@ chatRouter.post("/", requireAuth, async (req, res) => {
         });
 
         const annotations = extractAnnotations(fullText, docIndex, events);
-        await db.from("chat_messages").insert({
-            chat_id: chatId,
-            role: "assistant",
-            content: events.length ? events : null,
-            annotations: annotations.length ? annotations : null,
-        });
+        const { data: insertedAssistant } = await db
+            .from("chat_messages")
+            .insert({
+                chat_id: chatId,
+                role: "assistant",
+                content: events.length ? events : null,
+                annotations: annotations.length ? annotations : null,
+            })
+            .select("id")
+            .single();
+        if (insertedAssistant?.id) {
+            // Surfaces the new row's id to the client so the UI can wire
+            // up per-message affordances (flag "Not appropriate answer",
+            // export to PDF, print) without a full chat refetch.
+            try {
+                write(
+                    `data: ${JSON.stringify({ type: "message_id", messageId: insertedAssistant.id })}\n\n`,
+                );
+            } catch {
+                /* ignore */
+            }
+        }
+
+        // Cost telemetry: persist token counts + USD for this assistant
+        // turn. Best-effort — recordLlmUsage swallows its own errors.
+        if (usage) {
+            usageRecorded = true;
+            await recordLlmUsage({
+                userId,
+                provider: "claude",
+                model: selectedModel,
+                chatId,
+                projectId: project_id ?? null,
+                chatMessageId: insertedAssistant?.id ?? null,
+                usage,
+                durationMs: Date.now() - turnStartedAt,
+                status: "ok",
+            });
+        }
 
         if (!chatTitle && lastUser?.content) {
             await db
@@ -543,6 +716,35 @@ chatRouter.post("/", requireAuth, async (req, res) => {
         }
     } catch (err) {
         console.error("[chat/stream] error:", err);
+        // Even on failure we want a usage row when the upstream call had
+        // already produced any tokens (e.g. crash mid-tool-loop). The
+        // stream result is unavailable here; we log a zero-token row
+        // tagged with the error so the row count itself signals failure
+        // rate even before we have a UI.
+        if (!usageRecorded) {
+            try {
+                await recordLlmUsage({
+                    userId,
+                    provider: "claude",
+                    model: model ?? "unknown",
+                    chatId,
+                    projectId: project_id ?? null,
+                    usage: {
+                        inputTokens: 0,
+                        outputTokens: 0,
+                        cacheCreationInputTokens: 0,
+                        cacheReadInputTokens: 0,
+                        iterations: 0,
+                    },
+                    durationMs: Date.now() - turnStartedAt,
+                    status: "error",
+                    errorMessage:
+                        err instanceof Error ? err.message : String(err),
+                });
+            } catch {
+                /* recordLlmUsage already logs its own failures */
+            }
+        }
         try {
             write(
                 `data: ${JSON.stringify({ type: "error", message: "Stream error" })}\n\n`,
@@ -552,6 +754,7 @@ chatRouter.post("/", requireAuth, async (req, res) => {
             /* ignore */
         }
     } finally {
+        clearInterval(heartbeat);
         await closeMcpServers(mcpServers);
         res.end();
     }

@@ -55,7 +55,11 @@ userRouter.get("/profile", requireAuth, async (_req, res) => {
       message_credits_used: 0,
       credits_reset_date: new Date(Date.now() + 30 * 86400000).toISOString(),
       tier: "Free",
-      tabular_model: "gemini-3-flash-preview",
+      tabular_model: "claude-sonnet-4-6",
+      // Mirrors migration 113's column default. Highest-effort thinking
+      // is the safest default for a legal AI tool — better to overspend
+      // on a quick question than to under-think a hard one.
+      reasoning_effort: "high",
       // Match frontend/src/i18n/request.ts default so a freshly-paired
       // Word add-in opens in the same language as a freshly-loaded web app.
       preferred_language: "hr",
@@ -95,8 +99,14 @@ userRouter.patch("/profile", requireAuth, async (req, res) => {
     "message_credits_used", "credits_reset_date",
     // Locale code (e.g. "en", "hr"). Validated below before persisting.
     "preferred_language",
+    // Reasoning intensity for the main composer ("low" | "medium" |
+    // "high"). Validated below; CHECK constraint in migration 113
+    // would reject anything else but we'd rather drop early with a
+    // clean log line than have pg raise a 23514.
+    "reasoning_effort",
   ];
   const SUPPORTED_LOCALES = new Set(["en", "hr"]);
+  const SUPPORTED_EFFORTS = new Set(["low", "medium", "high"]);
   const updates: Record<string, any> = { updated_at: new Date().toISOString() };
   for (const key of allowed) {
     if (key in req.body) {
@@ -112,6 +122,9 @@ userRouter.patch("/profile", requireAuth, async (req, res) => {
       // load messages for.
       if (key === "preferred_language") {
         if (typeof val !== "string" || !SUPPORTED_LOCALES.has(val)) continue;
+      }
+      if (key === "reasoning_effort") {
+        if (typeof val !== "string" || !SUPPORTED_EFFORTS.has(val)) continue;
       }
       updates[key] = val;
     }

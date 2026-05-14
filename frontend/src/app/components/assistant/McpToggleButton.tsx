@@ -12,41 +12,53 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
     listMcpServers,
+    listBuiltinMcpServers,
     updateMcpServer,
+    updateBuiltinMcpServer,
     type McpServer,
+    type BuiltinMcpServer,
 } from "@/app/lib/mikeApi";
 
 /**
  * Sit next to "Documents" / "Workflows" in the chat input. Opens a popover
- * where the user toggles each of their configured MCP servers on/off. The
- * toggle flips `enabled` on the row, which the chat backend honors at the
- * start of the next request.
+ * where the user toggles each connector on/off. The toggle flips the
+ * effective `enabled` state, which the chat backend honors at the start
+ * of the next request.
+ *
+ * Built-in MCP servers (from mike/mcp.json) are mixed into the same list
+ * as user-defined connectors with the same plug icon and toggle. They
+ * default to enabled for every user; a per-user opt-out is persisted in
+ * `user_mcp_builtin_prefs` server-side. URL/headers stay server-side and
+ * are not surfaced here.
  */
 export function McpToggleButton() {
     const t = useTranslations("mcpToggle");
     const [servers, setServers] = useState<McpServer[] | null>(null);
+    const [builtins, setBuiltins] = useState<BuiltinMcpServer[] | null>(null);
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState<Record<string, boolean>>({});
 
     const reload = useCallback(async () => {
         try {
-            const list = await listMcpServers();
-            setServers(list);
+            const [userList, builtinList] = await Promise.all([
+                listMcpServers(),
+                listBuiltinMcpServers(),
+            ]);
+            setServers(userList);
+            setBuiltins(builtinList);
         } catch {
             setServers([]);
+            setBuiltins([]);
         }
     }, []);
 
-    // Refresh when the menu opens so toggles always reflect current state
-    // (the user may have edited servers in the settings page).
     useEffect(() => {
         if (open) reload();
         else if (servers === null) reload();
     }, [open, reload, servers]);
 
-    const handleToggle = async (server: McpServer) => {
+    const handleToggleUser = async (server: McpServer) => {
         setBusy((s) => ({ ...s, [server.id]: true }));
-        // Optimistic flip.
         setServers((prev) =>
             prev
                 ? prev.map((s) =>
@@ -57,19 +69,42 @@ export function McpToggleButton() {
         try {
             await updateMcpServer(server.id, { enabled: !server.enabled });
         } catch {
-            // Revert on error.
             await reload();
         } finally {
             setBusy((s) => ({ ...s, [server.id]: false }));
         }
     };
 
-    // Hide the button entirely when the user has no servers configured —
-    // surface only emerges when there's something to toggle.
-    if (servers !== null && servers.length === 0) return null;
+    const handleToggleBuiltin = async (server: BuiltinMcpServer) => {
+        const key = `builtin:${server.slug}`;
+        setBusy((s) => ({ ...s, [key]: true }));
+        setBuiltins((prev) =>
+            prev
+                ? prev.map((b) =>
+                      b.slug === server.slug ? { ...b, enabled: !b.enabled } : b,
+                  )
+                : prev,
+        );
+        try {
+            await updateBuiltinMcpServer(server.slug, {
+                enabled: !server.enabled,
+            });
+        } catch {
+            await reload();
+        } finally {
+            setBusy((s) => ({ ...s, [key]: false }));
+        }
+    };
 
-    const enabledCount = servers?.filter((s) => s.enabled).length ?? 0;
-    const totalCount = servers?.length ?? 0;
+    const builtinCount = builtins?.length ?? 0;
+    const userCount = servers?.length ?? 0;
+
+    if (servers !== null && builtins !== null && userCount === 0 && builtinCount === 0) return null;
+
+    const enabledCount =
+        (servers?.filter((s) => s.enabled).length ?? 0) +
+        (builtins?.filter((b) => b.enabled).length ?? 0);
+    const totalCount = userCount + builtinCount;
 
     return (
         <DropdownMenu onOpenChange={setOpen}>
@@ -101,15 +136,29 @@ export function McpToggleButton() {
                     {t("connectors")}
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+
+                {/* Built-in connectors first — they're "preset defaults". */}
+                {builtins?.map((b) => (
+                    <BuiltinRow
+                        key={`builtin:${b.slug}`}
+                        server={b}
+                        busy={busy[`builtin:${b.slug}`] === true}
+                        onToggle={() => handleToggleBuiltin(b)}
+                        defaultLabel={t("defaultBadge")}
+                    />
+                ))}
+
+                {/* User-configured connectors */}
                 {servers?.map((s) => (
                     <McpRow
                         key={s.id}
                         server={s}
                         busy={busy[s.id] === true}
-                        onToggle={() => handleToggle(s)}
+                        onToggle={() => handleToggleUser(s)}
                         t={t}
                     />
                 ))}
+
                 <DropdownMenuSeparator />
                 <a
                     href="/account/mcp"
@@ -120,6 +169,36 @@ export function McpToggleButton() {
                 </a>
             </DropdownMenuContent>
         </DropdownMenu>
+    );
+}
+
+function BuiltinRow({
+    server,
+    busy,
+    onToggle,
+    defaultLabel,
+}: {
+    server: BuiltinMcpServer;
+    busy: boolean;
+    onToggle: () => void;
+    defaultLabel: string;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onToggle}
+            disabled={busy}
+            className="w-full flex items-center justify-between gap-2 px-2 py-1.5 text-sm hover:bg-gray-50 rounded-sm disabled:opacity-50"
+        >
+            <span className="flex items-center gap-2 min-w-0">
+                <Plug className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                <span className="truncate">{server.name}</span>
+                <span className="text-[10px] uppercase tracking-wide text-blue-700/70 bg-blue-50 px-1 py-0.5 rounded shrink-0 leading-none">
+                    {defaultLabel}
+                </span>
+            </span>
+            <ToggleSwitch on={server.enabled} />
+        </button>
     );
 }
 

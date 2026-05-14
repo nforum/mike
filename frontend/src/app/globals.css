@@ -329,6 +329,26 @@
     .animate-shimmer {
         animation: shimmer 8s linear infinite;
     }
+
+    @keyframes mikeCompassIntro {
+        0% {
+            transform: rotate(-540deg) scale(0.35);
+            opacity: 0;
+        }
+        40% {
+            opacity: 1;
+        }
+        100% {
+            transform: rotate(0deg) scale(1);
+            opacity: 1;
+        }
+    }
+
+    .mike-compass-intro {
+        animation: mikeCompassIntro 1200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        transform-origin: center;
+        will-change: transform, opacity;
+    }
 }
 
 /* ─── Tiptap WYSIWYG workflow editor ────────────────────────────── */

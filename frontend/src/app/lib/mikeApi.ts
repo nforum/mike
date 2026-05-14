@@ -32,6 +32,7 @@ interface ServerMessage {
     files?: { filename: string; document_id?: string }[] | null;
     workflow?: { id: string; title: string } | null;
     annotations?: MikeCitationAnnotation[] | null;
+    is_flagged?: boolean | null;
     created_at: string;
 }
 interface ServerChatDetailOut {
@@ -432,6 +433,7 @@ export async function getChat(chatId: string): Promise<MikeChatDetailOut> {
     const messages: MikeMessage[] = raw.messages.map((m) => {
         if (m.role === "user") {
             return {
+                id: m.id,
                 role: "user",
                 content: typeof m.content === "string" ? m.content : "",
                 files: m.files ?? undefined,
@@ -442,6 +444,7 @@ export async function getChat(chatId: string): Promise<MikeChatDetailOut> {
             ? (m.content as AssistantEvent[])
             : undefined;
         return {
+            id: m.id,
             role: "assistant",
             content:
                 events
@@ -450,9 +453,31 @@ export async function getChat(chatId: string): Promise<MikeChatDetailOut> {
                     .join("") ?? "",
             annotations: m.annotations ?? undefined,
             events,
+            flagged: !!m.is_flagged,
         };
     });
     return { chat: raw.chat, messages };
+}
+
+/**
+ * Toggle the "not appropriate answer" flag on an assistant message.
+ * Returns the new flag state so the caller can sync local UI without a
+ * full chat refetch.
+ */
+export async function setMessageFlag(
+    messageId: string,
+    flagged: boolean,
+    reason?: string,
+): Promise<{ id: string; is_flagged: boolean; flagged_at: string | null }> {
+    return apiRequest<{
+        id: string;
+        is_flagged: boolean;
+        flagged_at: string | null;
+    }>(`/chat/messages/${messageId}/flag`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flagged, reason }),
+    });
 }
 
 export async function renameChat(chatId: string, title: string): Promise<void> {
@@ -605,6 +630,8 @@ export async function streamChat(payload: {
     chat_id?: string;
     project_id?: string;
     model?: string;
+    /** "low" | "medium" | "high" — reasoning intensity for this turn. */
+    effort?: string;
     signal?: AbortSignal;
 }): Promise<Response> {
     const { signal, ...body } = payload;
@@ -633,6 +660,8 @@ export async function streamProjectChat(payload: {
     messages: StreamChatMessage[];
     chat_id?: string;
     model?: string;
+    /** "low" | "medium" | "high" — reasoning intensity for this turn. */
+    effort?: string;
     displayed_doc?: { filename: string; document_id: string };
     attached_documents?: { filename: string; document_id: string }[];
     signal?: AbortSignal;
@@ -1018,6 +1047,35 @@ export interface McpServerTestResult {
 
 export async function listMcpServers(): Promise<McpServer[]> {
     return apiRequest<McpServer[]>("/user/mcp-servers");
+}
+
+export interface BuiltinMcpServer {
+    slug: string;
+    name: string;
+    enabled: boolean;
+}
+
+export async function listBuiltinMcpServers(): Promise<BuiltinMcpServer[]> {
+    return apiRequest<BuiltinMcpServer[]>("/builtin-mcp-servers");
+}
+
+/**
+ * Toggle a built-in (server-side) MCP connector for the current user.
+ * Built-ins default to enabled; this writes only the deviation. The
+ * change applies to the next chat request.
+ */
+export async function updateBuiltinMcpServer(
+    slug: string,
+    payload: { enabled: boolean },
+): Promise<{ slug: string; enabled: boolean }> {
+    return apiRequest<{ slug: string; enabled: boolean }>(
+        `/builtin-mcp-servers/${encodeURIComponent(slug)}`,
+        {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        },
+    );
 }
 
 export async function createMcpServer(payload: {

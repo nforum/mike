@@ -8,7 +8,11 @@
  */
 
 import pg from 'pg';
-import { Connector, AuthTypes } from '@google-cloud/cloud-sql-connector';
+import {
+  Connector,
+  AuthTypes,
+  IpAddressTypes,
+} from '@google-cloud/cloud-sql-connector';
 
 const { Pool } = pg;
 
@@ -28,10 +32,22 @@ export async function getPool(): Promise<InstanceType<typeof Pool>> {
   if (instanceConnectionName) {
     // Production: Cloud SQL Connector → IAM auth → mike_app role
     // No password needed — auth via SA identity
+    //
+    // DB_IP_TYPE controls whether the connector dials Cloud SQL via its
+    // PUBLIC IP (default, no VPC required) or PRIVATE IP (via VPC peering).
+    // When the backend runs behind a Serverless VPC Access connector with
+    // egress=all-traffic we must use PRIVATE; the public 3307 endpoint is
+    // unreachable through Cloud NAT.
+    const ipType =
+      (process.env.DB_IP_TYPE ?? 'PUBLIC').toUpperCase() === 'PRIVATE'
+        ? IpAddressTypes.PRIVATE
+        : IpAddressTypes.PUBLIC;
+
     connector = new Connector();
     const clientOpts = await connector.getOptions({
       instanceConnectionName,
       authType: AuthTypes.IAM,
+      ipType,
     });
     pool = new Pool({
       ...clientOpts,
@@ -39,6 +55,7 @@ export async function getPool(): Promise<InstanceType<typeof Pool>> {
       database: process.env.DB_NAME ?? 'mike',
       max: 10,
     });
+    console.log(`[db] Cloud SQL Connector init (ipType=${ipType})`);
   } else {
     // Development: standard connection string
     pool = new Pool({

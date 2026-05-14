@@ -316,6 +316,7 @@ export function useAssistantChat({
             }));
 
             const model = message.model;
+            const effort = message.effort;
 
             const displayedDoc = opts?.displayedDoc ?? null;
 
@@ -337,6 +338,7 @@ export function useAssistantChat({
                       messages: apiMessages,
                       chat_id: chatId,
                       model,
+                      effort,
                       displayed_doc: displayedDoc
                           ? {
                                 filename: displayedDoc.filename,
@@ -351,6 +353,7 @@ export function useAssistantChat({
                       messages: apiMessages,
                       chat_id: chatId,
                       model,
+                      effort,
                       signal: controller.signal,
                   }));
 
@@ -387,6 +390,27 @@ export function useAssistantChat({
                             streamedChatId = data.chatId;
                             setChatId(data.chatId);
                             setCurrentChatId(data.chatId);
+                            continue;
+                        }
+
+                        if (data.type === "message_id") {
+                            // Backend emits this once the assistant turn
+                            // is persisted. Wire the new chat_messages.id
+                            // onto the last assistant message so per-
+                            // message actions (flag/unflag, future
+                            // analytics) have an id to operate on.
+                            const newId = data.messageId as string;
+                            setMessages((prev) => {
+                                const updated = [...prev];
+                                const last = updated[updated.length - 1];
+                                if (last?.role === "assistant" && !last.id) {
+                                    updated[updated.length - 1] = {
+                                        ...last,
+                                        id: newId,
+                                    };
+                                }
+                                return updated;
+                            });
                             continue;
                         }
 
@@ -580,6 +604,81 @@ export function useAssistantChat({
                                 total_matches: 0,
                                 isStreaming: true,
                             });
+                            continue;
+                        }
+
+                        if (data.type === "web_search_started") {
+                            // Surface the "Searching the web…" affordance
+                            // immediately. Matched by `query` to the
+                            // follow-up `web_search_result` event so we can
+                            // upgrade in place rather than render twice.
+                            pushEvent({
+                                type: "web_search_started",
+                                query: (data.query as string) ?? "",
+                                provider: (data.provider as string) ?? "auto",
+                                isStreaming: true,
+                            });
+                            continue;
+                        }
+
+                        if (data.type === "web_search_result") {
+                            const query = (data.query as string) ?? "";
+                            const provider = (data.provider as string) ?? "auto";
+                            const results = Array.isArray(data.results)
+                                ? (data.results as Array<{
+                                      title?: string;
+                                      url?: string;
+                                      snippet?: string;
+                                      published_date?: string | null;
+                                  }>).map((r) => ({
+                                      title: r.title ?? "",
+                                      url: r.url ?? "",
+                                      snippet: r.snippet ?? "",
+                                      published_date: r.published_date ?? null,
+                                  }))
+                                : [];
+                            const error =
+                                typeof data.error === "string" && data.error
+                                    ? data.error
+                                    : null;
+                            // Replace the in-flight `web_search_started`
+                            // placeholder for this query with the final
+                            // result event. If no placeholder exists (e.g.
+                            // race), append a fresh result.
+                            const events = eventsRef.current;
+                            const idx = events.findIndex(
+                                (e) =>
+                                    e.type === "web_search_started" &&
+                                    e.query === query &&
+                                    e.isStreaming,
+                            );
+                            const finalEvent = {
+                                type: "web_search_result" as const,
+                                query,
+                                provider,
+                                results,
+                                error,
+                            };
+                            if (idx >= 0) {
+                                const next = [...events];
+                                next[idx] = finalEvent;
+                                eventsRef.current = next;
+                                const snapshot = [...next];
+                                setMessages((prev) => {
+                                    const updated = [...prev];
+                                    const last = updated[updated.length - 1];
+                                    if (last?.role === "assistant") {
+                                        updated[updated.length - 1] = {
+                                            ...last,
+                                            events: snapshot,
+                                        };
+                                    }
+                                    return updated;
+                                });
+                            } else {
+                                pushEvent(finalEvent);
+                            }
+                            pushThinkingPlaceholder();
                             continue;
                         }
 

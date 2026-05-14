@@ -16,7 +16,7 @@ export function SiteLogo({
 }: SiteLogoProps) {
     const landingHref =
         process.env.NODE_ENV === "production"
-            ? "https://mikeoss.com"
+            ? "https://max.eulex.ai"
             : "http://localhost:3000";
     const sizeClasses = {
         sm: "text-xl",
@@ -26,20 +26,20 @@ export function SiteLogo({
     };
 
     const iconSizes = {
-        sm: 20,
-        md: 22,
-        lg: 32,
-        xl: 48,
+        sm: 24,
+        md: 30,
+        lg: 44,
+        xl: 64,
     };
 
     const logo = (
         <h1
-            className={`flex items-center gap-1.5 ${sizeClasses[size]} font-light font-serif ${
+            className={`flex items-center gap-2 leading-none ${sizeClasses[size]} font-light font-serif ${
                 animate ? "sidebar-fade-in" : ""
             } ${className}`}
         >
             <MikeIcon size={iconSizes[size]} />
-            <span>Max</span>
+            <span className="leading-none">Max</span>
         </h1>
     );
 

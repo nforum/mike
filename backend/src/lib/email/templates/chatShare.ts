@@ -52,7 +52,7 @@ const COPY = {
     hr: {
         subject: (owner: string, title: string) =>
             `${owner} dijeli razgovor s tobom: "${title}"`,
-        greeting: "Bok,",
+        greeting: "Pozdrav,",
         intro: (owner: string, ownerEmail: string, title: string) =>
             `${owner} (${ownerEmail}) podijelio/la je s tobom razgovor "${title}" iz Max asistenta.`,
         whatYouSee:

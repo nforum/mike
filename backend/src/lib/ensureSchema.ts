@@ -168,6 +168,129 @@ const STATEMENTS: ReadonlyArray<{ name: string; sql: string }> = [
                 ON public.chats USING gin (shared_with);
         `,
     },
+    {
+        // Per-message "not appropriate answer" flag — see migration 110.
+        // Denormalised boolean on chat_messages keeps the GET /chat reads
+        // cheap; the audit table (next entries) holds the toggle history.
+        name: "chat_messages.flag_columns",
+        sql: `
+            ALTER TABLE public.chat_messages
+                ADD COLUMN IF NOT EXISTS is_flagged boolean NOT NULL DEFAULT false,
+                ADD COLUMN IF NOT EXISTS flagged_at timestamptz,
+                ADD COLUMN IF NOT EXISTS flagged_by uuid;
+        `,
+    },
+    {
+        name: "chat_message_flags",
+        sql: `
+            CREATE TABLE IF NOT EXISTS public.chat_message_flags (
+                id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+                chat_message_id uuid        NOT NULL REFERENCES public.chat_messages(id) ON DELETE CASCADE,
+                chat_id         uuid        NOT NULL REFERENCES public.chats(id) ON DELETE CASCADE,
+                user_id         uuid        NOT NULL,
+                action          text        NOT NULL CHECK (action IN ('flag', 'unflag')),
+                reason          text,
+                created_at      timestamptz NOT NULL DEFAULT now()
+            );
+        `,
+    },
+    {
+        name: "chat_message_flags_message_idx",
+        sql: `
+            CREATE INDEX IF NOT EXISTS idx_chat_message_flags_message
+                ON public.chat_message_flags (chat_message_id);
+        `,
+    },
+    {
+        name: "chat_message_flags_chat_idx",
+        sql: `
+            CREATE INDEX IF NOT EXISTS idx_chat_message_flags_chat
+                ON public.chat_message_flags (chat_id);
+        `,
+    },
+    {
+        name: "chat_messages_flagged_idx",
+        sql: `
+            CREATE INDEX IF NOT EXISTS idx_chat_messages_flagged
+                ON public.chat_messages (chat_id)
+                WHERE is_flagged = true;
+        `,
+    },
+    {
+        // Per-user override for built-in MCP connectors loaded from
+        // mike/mcp.json. Absent row = default-enabled. See migration 111.
+        // The composite PK lets us upsert on (user_id, slug) without an
+        // extra unique index.
+        name: "user_mcp_builtin_prefs",
+        sql: `
+            CREATE TABLE IF NOT EXISTS public.user_mcp_builtin_prefs (
+                user_id     uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                slug        text        NOT NULL,
+                enabled     boolean     NOT NULL,
+                created_at  timestamptz NOT NULL DEFAULT now(),
+                updated_at  timestamptz NOT NULL DEFAULT now(),
+                PRIMARY KEY (user_id, slug)
+            );
+        `,
+    },
+    {
+        name: "user_mcp_builtin_prefs_user_idx",
+        sql: `
+            CREATE INDEX IF NOT EXISTS idx_user_mcp_builtin_prefs_user
+                ON public.user_mcp_builtin_prefs (user_id);
+        `,
+    },
+    {
+        // Per-request LLM usage log for cost tracking. See migration 112.
+        // Anthropic returns authoritative token counts; USD is computed
+        // in app code from the published Sonnet 4.6 rates.
+        name: "llm_usage",
+        sql: `
+            CREATE TABLE IF NOT EXISTS public.llm_usage (
+                id                          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id                     uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                provider                    text        NOT NULL,
+                model                       text        NOT NULL,
+                chat_id                     uuid,
+                project_id                  uuid,
+                chat_message_id             uuid,
+                project_chat_message_id     uuid,
+                iterations                  int         NOT NULL DEFAULT 1,
+                input_tokens                int         NOT NULL DEFAULT 0,
+                output_tokens               int         NOT NULL DEFAULT 0,
+                cache_creation_input_tokens int         NOT NULL DEFAULT 0,
+                cache_read_input_tokens     int         NOT NULL DEFAULT 0,
+                cost_usd                    numeric(12, 6) NOT NULL DEFAULT 0,
+                duration_ms                 int,
+                status                      text        NOT NULL DEFAULT 'ok'
+                                                        CHECK (status IN ('ok', 'error', 'aborted')),
+                error_message               text,
+                created_at                  timestamptz NOT NULL DEFAULT now()
+            );
+        `,
+    },
+    {
+        name: "llm_usage_user_created_idx",
+        sql: `
+            CREATE INDEX IF NOT EXISTS idx_llm_usage_user_created
+                ON public.llm_usage (user_id, created_at DESC);
+        `,
+    },
+    {
+        name: "llm_usage_chat_idx",
+        sql: `
+            CREATE INDEX IF NOT EXISTS idx_llm_usage_chat
+                ON public.llm_usage (chat_id, created_at DESC)
+                WHERE chat_id IS NOT NULL;
+        `,
+    },
+    {
+        name: "llm_usage_model_created_idx",
+        sql: `
+            CREATE INDEX IF NOT EXISTS idx_llm_usage_model_created
+                ON public.llm_usage (model, created_at DESC);
+        `,
+    },
 ];
 
 // Errors that indicate the connection itself died (Cloud SQL Auth Proxy

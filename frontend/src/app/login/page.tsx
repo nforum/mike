@@ -180,6 +180,31 @@ export default function LoginPage() {
                         </button>
                     </div>
 
+                    <p className="mt-5 text-center text-[11px] leading-relaxed text-gray-500">
+                        {t.rich("legalNotice", {
+                            terms: (chunks) => (
+                                <a
+                                    href="https://eulex.ai/terms"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:underline"
+                                >
+                                    {chunks}
+                                </a>
+                            ),
+                            privacy: (chunks) => (
+                                <a
+                                    href="https://eulex.ai/privacy"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:underline"
+                                >
+                                    {chunks}
+                                </a>
+                            ),
+                        })}
+                    </p>
+
                     {error && (
                         <div className="mt-4 text-red-600 text-sm bg-red-50 p-3 rounded">
                             {error}

@@ -6,6 +6,7 @@ import {
     Check,
     ChevronUp,
     Loader2,
+    Plug,
     Plus,
     Trash2,
 } from "lucide-react";
@@ -17,12 +18,15 @@ import {
     createMcpServer,
     deleteMcpServer,
     listMcpServers,
+    listBuiltinMcpServers,
     resetMcpOauth,
     startMcpOauth,
     testMcpServer,
     updateMcpServer,
+    updateBuiltinMcpServer,
     type McpServer,
     type McpServerTestResult,
+    type BuiltinMcpServer,
 } from "@/app/lib/mikeApi";
 
 type DraftHeader = { key: string; value: string };
@@ -43,6 +47,7 @@ const EMPTY_DRAFT: Draft = {
 
 export default function McpServersPage() {
     const [servers, setServers] = useState<McpServer[]>([]);
+    const [builtinServers, setBuiltinServers] = useState<BuiltinMcpServer[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -63,8 +68,12 @@ export default function McpServersPage() {
     const reload = useCallback(async () => {
         setLoadError(null);
         try {
-            const list = await listMcpServers();
+            const [list, builtins] = await Promise.all([
+                listMcpServers(),
+                listBuiltinMcpServers(),
+            ]);
             setServers(list);
+            setBuiltinServers(builtins);
         } catch (err) {
             setLoadError(err instanceof Error ? err.message : "Failed to load");
         } finally {
@@ -207,6 +216,28 @@ export default function McpServersPage() {
             // immediately if the server still works after re-enabling.
             if (wasDisabled) void runAutoTest(server.id);
         } catch (err) {
+            await alert({
+                title: t("alerts.updateFailed"),
+                message:
+                    err instanceof Error ? err.message : t("alerts.failedToUpdate"),
+            });
+        }
+    };
+
+    const handleToggleBuiltin = async (server: BuiltinMcpServer) => {
+        // Optimistic flip — the dropdown sees the same backend state and
+        // will reload on next open, but flickering the row here is cheap.
+        setBuiltinServers((prev) =>
+            prev.map((b) =>
+                b.slug === server.slug ? { ...b, enabled: !b.enabled } : b,
+            ),
+        );
+        try {
+            await updateBuiltinMcpServer(server.slug, {
+                enabled: !server.enabled,
+            });
+        } catch (err) {
+            await reload();
             await alert({
                 title: t("alerts.updateFailed"),
                 message:
@@ -366,27 +397,89 @@ export default function McpServersPage() {
                     <AlertCircle className="h-4 w-4" />
                     {loadError}
                 </div>
-            ) : servers.length === 0 ? (
-                <div className="text-sm text-gray-500 border border-dashed border-gray-200 rounded-md py-6 text-center">
-                    {t("noConnectors")}
-                </div>
             ) : (
-                <div className="space-y-3">
-                    {servers.map((s) => (
-                        <ServerCard
-                            key={s.id}
-                            server={s}
-                            testing={testing[s.id] === true}
-                            testResult={testResults[s.id]}
-                            onToggle={() => handleToggleEnabled(s)}
-                            onDelete={() => handleDelete(s)}
-                            onTest={() => handleTest(s)}
-                            onSignIn={() => launchOAuth(s.id)}
-                            onResetOauth={() => handleResetAndSignIn(s)}
-                        />
-                    ))}
-                </div>
+                <>
+                    {(builtinServers.length > 0 || servers.length > 0) ? (
+                        <div className="space-y-3">
+                            {/* Built-in connectors first — they're "preset
+                                defaults" that the user can opt out of but
+                                cannot edit (URL/headers stay server-side). */}
+                            {builtinServers.map((b) => (
+                                <BuiltinServerCard
+                                    key={b.slug}
+                                    server={b}
+                                    onToggle={() => handleToggleBuiltin(b)}
+                                />
+                            ))}
+
+                            {servers.map((s) => (
+                                <ServerCard
+                                    key={s.id}
+                                    server={s}
+                                    testing={testing[s.id] === true}
+                                    testResult={testResults[s.id]}
+                                    onToggle={() => handleToggleEnabled(s)}
+                                    onDelete={() => handleDelete(s)}
+                                    onTest={() => handleTest(s)}
+                                    onSignIn={() => launchOAuth(s.id)}
+                                    onResetOauth={() => handleResetAndSignIn(s)}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-sm text-gray-500 border border-dashed border-gray-200 rounded-md py-6 text-center">
+                            {t("noConnectors")}
+                        </div>
+                    )}
+                </>
             )}
+        </div>
+    );
+}
+
+function BuiltinServerCard({
+    server,
+    onToggle,
+}: {
+    server: BuiltinMcpServer;
+    onToggle: () => void;
+}) {
+    const t = useTranslations("connectors");
+    const tc = useTranslations("common");
+    return (
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="flex items-start justify-between gap-3 p-4">
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-medium text-gray-900 truncate">
+                            {server.name}
+                        </h3>
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                            {t("card.defaultBadge")}
+                        </span>
+                        {server.enabled ? (
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                                {t("card.enabled")}
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                                {t("card.disabled")}
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
+                        <Plug className="h-3 w-3 shrink-0" />
+                        {t("card.builtinHint")}
+                    </p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                    <Button variant="outline" size="sm" onClick={onToggle}>
+                        {server.enabled ? tc("disable") : tc("enable")}
+                    </Button>
+                </div>
+            </div>
         </div>
     );
 }

@@ -1,0 +1,29 @@
+{
+    "_comment": "Vidljivo svim korisnicima u Postavke → Novosti. Nove unose dodaj na vrh polja 'entries'. Tipovi promjena: 'added' | 'improved' | 'changed' | 'fixed' | 'removed' | 'security'. Tekst i naslov mogu biti string (isto za sve jezike) ili objekt { en, hr } za lokalizirano.",
+    "entries": [
+        {
+            "version": "0.5.0",
+            "date": "2026-05-13",
+            "title": {
+                "en": "Changelog in account settings",
+                "hr": "Novosti u postavkama računa"
+            },
+            "changes": [
+                {
+                    "type": "added",
+                    "text": {
+                        "en": "New 'What's new' tab in account settings showing the changelog from a single JSON file.",
+                        "hr": "Nova kartica 'Novosti' u postavkama računa koja prikazuje changelog iz jedinstvene JSON datoteke."
+                    }
+                },
+                {
+                    "type": "added",
+                    "text": {
+                        "en": "Changelog supports localized titles and descriptions (en/hr).",
+                        "hr": "Changelog podržava lokalizirane naslove i opise (en/hr)."
+                    }
+                }
+            ]
+        }
+    ]
+}

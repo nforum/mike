@@ -12,12 +12,13 @@ import { tabularRouter } from "./routes/tabular";
 import { workflowsRouter } from "./routes/workflows";
 import { userRouter } from "./routes/user";
 import { downloadsRouter } from "./routes/downloads";
-import { mcpServersRouter } from "./routes/mcpServers";
+import { mcpServersRouter, builtinMcpRouter } from "./routes/mcpServers";
 import { mcpOauthRouter } from "./routes/mcpOauth";
 import { authPairRouter } from "./routes/authPair";
 import { searchRouter } from "./routes/search";
 import { integrationsRouter } from "./routes/integrations";
 import { chatSharesRouter } from "./routes/chatShares";
+import { adminMaxRouter } from "./routes/adminMax";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -29,11 +30,12 @@ const ALLOWED_ORIGINS = [
   // taskpane origin (https://localhost:3002) to the backend on :3001 — needs CORS.
   "https://localhost:3002",
   "https://127.0.0.1:3002",
-  // Cloud Run exposes the same service under two URL forms:
+  // Production: custom CNAME on top of Cloud Run.
+  "https://max.eulex.ai",
+  // Cloud Run also exposes the same service under two run.app URL forms:
   //   - hash-based   : https://mike-frontend-cc6nrgescq-ew.a.run.app
   //   - project-num  : https://mike-frontend-516192556389.europe-west1.run.app
-  // Both must be allow-listed because the browser uses whichever URL the
-  // user actually loaded as the Origin header.
+  // Both kept allow-listed for direct access / health checks / DNS fallback.
   "https://mike-frontend-cc6nrgescq-ew.a.run.app",
   "https://mike-frontend-516192556389.europe-west1.run.app",
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
@@ -82,10 +84,12 @@ app.use("/user", userRouter);
 app.use("/users", userRouter);
 app.use("/download", downloadsRouter);
 app.use("/user/mcp-servers", mcpServersRouter);
+app.use("/builtin-mcp-servers", builtinMcpRouter);
 app.use("/mcp/oauth", mcpOauthRouter);
 app.use("/auth/pair", authPairRouter);
 app.use("/search", searchRouter);
 app.use("/integrations", integrationsRouter);
+app.use("/adminmax", adminMaxRouter);
 // chatSharesRouter handles both /chat/:id/share* (owner side) and
 // /share/:token* (recipient side), so it must mount at the root.
 app.use("/", chatSharesRouter);
@@ -139,6 +143,24 @@ const server = app.listen(PORT, () => {
 });
 
 // ── Graceful shutdown (Cloud Run sends SIGTERM) ─────────────
+//
+// Cloud Run sends SIGTERM on revision swap (rolling deploy), scale-down,
+// or `services update`. The service must keep in-flight chat streams
+// alive long enough to finish — otherwise the stream's underlying
+// Anthropic socket dies mid-answer with `UND_ERR_SOCKET: other side
+// closed` and the browser shows a generic "load failed".
+//
+// `server.close()` (Node http) stops accepting new connections but lets
+// existing ones drain. The forced `process.exit(1)` timer below MUST be
+// at least as large as the longest expected in-flight request — i.e.
+// the Cloud Run service-level --timeout. We size it to 1200s (20 min)
+// to match `gcloud run services update --timeout=1200` so SIGTERM never
+// truncates a stream the platform itself was still willing to hold open.
+//
+// NB: Cloud Run will SIGKILL anyway after its own grace expires
+// (~10 min for revision swap), but at that point the request had max
+// time to finish, and we exit with a non-zero so the platform records
+// the forced termination.
 function shutdown(signal: string) {
   console.log(`[shutdown] Received ${signal}, closing server…`);
   server.close(async () => {
@@ -146,8 +168,12 @@ function shutdown(signal: string) {
     console.log("[shutdown] Clean exit");
     process.exit(0);
   });
-  // Force exit after 10s if connections won't drain
-  setTimeout(() => process.exit(1), 10_000).unref();
+  setTimeout(() => {
+    console.warn(
+      "[shutdown] Forced exit after 1200s — in-flight requests did not drain in time",
+    );
+    process.exit(1);
+  }, 1_200_000).unref();
 }
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));

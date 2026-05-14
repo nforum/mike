@@ -28,9 +28,14 @@ export const OPENAI_LOW_MODELS = ["gpt-5.4-nano"] as const;
 export const LOCAL_LLM_LOW_MODELS = ["localllm-lite"] as const;
 export const MISTRAL_LOW_MODELS = ["mistral-small-latest"] as const;
 
-export const DEFAULT_MAIN_MODEL = "localllm-main";
+// Default main model is Claude Sonnet 4.6 — chosen because the prod backend
+// always has ANTHROPIC_API_KEY wired via Secret Manager (see cloudbuild.yaml
+// and scripts/deploy.sh `--update-secrets`). LocalLLM remains a valid fallback
+// for self-hosters but no longer steals the slot when a Claude key is present
+// (resolveDefaultMainModel handles that priority).
+export const DEFAULT_MAIN_MODEL = "claude-sonnet-4-6";
 export const DEFAULT_TITLE_MODEL = "localllm-lite";
-export const DEFAULT_TABULAR_MODEL = "localllm-main";
+export const DEFAULT_TABULAR_MODEL = "claude-sonnet-4-6";
 
 const ALL_MODELS = new Set<string>([
     ...CLAUDE_MAIN_MODELS,

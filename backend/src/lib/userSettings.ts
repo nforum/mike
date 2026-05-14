@@ -27,22 +27,23 @@ export type UserModelSettings = {
  *
  * The Word add-in deliberately ships without a model picker — the user
  * configures preferred providers in the Max web app once, and the
- * add-in should "just work". Order of preference roughly mirrors the
- * web app's per-message defaults:
+ * add-in should "just work". Order of preference:
  *
- *   1. LocalLLM (if the operator wired up an in-house endpoint)
- *   2. Claude  — Sonnet 4.6 for main chat
- *   3. Gemini  — 3.1 Pro
- *   4. Mistral — Large
- *   5. OpenAI  — gpt-5.5 (last because OpenAI cost / latency is highest)
+ *   1. Claude   — Sonnet 4.6 (primary; prod always has a server key wired
+ *                via Secret Manager, see cloudbuild.yaml).
+ *   2. LocalLLM — if the operator wired up an in-house endpoint and the
+ *                user has no Claude entitlement.
+ *   3. Gemini   — 3.1 Pro
+ *   4. Mistral  — Large
+ *   5. OpenAI   — gpt-5.5 (last because OpenAI cost / latency is highest)
  *
  * If none of the above are available, we fall back to `DEFAULT_MAIN_MODEL`
- * and let the downstream OpenAI client surface its own credentials error,
- * which is at least obvious in logs.
+ * and let the downstream client surface its own credentials error, which
+ * is at least obvious in logs.
  */
 export function resolveDefaultMainModel(apiKeys?: UserApiKeys): string {
-    if (process.env.VLLM_BASE_URL?.trim()) return "localllm-main";
     if (apiKeys?.claude?.trim()) return "claude-sonnet-4-6";
+    if (process.env.VLLM_BASE_URL?.trim()) return "localllm-main";
     if (apiKeys?.gemini?.trim()) return "gemini-3.1-pro-preview";
     if (apiKeys?.mistral?.trim()) return "mistral-large-latest";
     if (apiKeys?.openai?.trim()) return "gpt-5.5";

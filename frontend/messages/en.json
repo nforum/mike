@@ -19,6 +19,18 @@
     "copy": "Copy",
     "copied": "Copied"
   },
+  "messageActions": {
+    "print": "Print",
+    "exportPdf": "Export to PDF",
+    "flagTooltip": "Not appropriate answer",
+    "unflagTooltip": "Remove flag",
+    "documentTitle": "Max Assistant Answer",
+    "brandLabel": "Max Legal AI Assistant",
+    "generatedOn": "Generated",
+    "watermark": "Confidential · For internal use",
+    "marketingTagline": "Trusted AI for legal excellence",
+    "disclaimer": "AI can make mistakes. Answers are not legal advice."
+  },
   "sidebar": {
     "assistant": "Assistant",
     "projects": "Projects",
@@ -43,7 +55,8 @@
     "google": "Google",
     "linkedIn": "LinkedIn",
     "noAccount": "Sign in with your EULEX account. Don't have one?",
-    "createAccount": "Create account"
+    "createAccount": "Create account",
+    "legalNotice": "By signing in, you accept the <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy> on eulex.ai and confirm that you are 18 years of age or older."
   },
   "signup": {
     "title": "Create Account",
@@ -62,7 +75,8 @@
       "models": "Models & API Keys",
       "connectors": "Connectors",
       "fileSources": "File sources",
-      "wordAddin": "Word Add-in"
+      "wordAddin": "Word Add-in",
+      "changelog": "What's new"
     },
     "profile": {
       "title": "Profile",
@@ -124,6 +138,9 @@
     },
     "loadingServers": "Loading servers…",
     "noConnectors": "No connectors configured yet.",
+    "builtinTitle": "Built-in connectors",
+    "builtinAlwaysOn": "Always on",
+    "customTitle": "Your connectors",
     "addForm": {
       "name": "Name",
       "namePlaceholder": "My connector",
@@ -157,7 +174,9 @@
       "discoveredTools": "Discovered {count} tool{count, plural, one {} other {s}}",
       "hide": "Hide",
       "show": "Show",
-      "deleteServer": "Delete server"
+      "deleteServer": "Delete server",
+      "defaultBadge": "Default",
+      "builtinHint": "Preset connector — you can disable it, but the configuration is managed by the administrator."
     },
     "confirm": {
       "removeTitle": "Remove connector",
@@ -186,12 +205,26 @@
   "assistant": {
     "greeting": "Hi, {username}",
     "disclaimer": "AI can make mistakes. Answers are not legal advice.",
-    "placeholder": "Ask a question about your documents...",
+    "placeholder": "Ask a question...",
     "projects": "Projects",
     "workflows": "Workflows",
     "addDocuments": "Add Documents",
     "openProjects": "Open projects",
-    "openWorkflows": "Open workflows"
+    "openWorkflows": "Open workflows",
+    "modelToggle": {
+      "trigger": "Model: {model}",
+      "triggerAria": "Choose model and reasoning effort. Currently {model}.",
+      "apiKeyMissingTitle": "API key missing for selected model",
+      "effort": {
+        "label": "Reasoning effort",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "lowTitle": "Faster, cheaper. Minimal thinking before responding.",
+        "mediumTitle": "Balanced. A moderate amount of thinking before responding.",
+        "highTitle": "Deepest thinking. Slower and more expensive, best on hard problems."
+      }
+    }
   },
   "projects": {
     "title": "Projects",
@@ -507,6 +540,9 @@
     "loadingConnectors": "Loading connectors",
     "connectorStatus": "{enabled} of {total} connectors enabled",
     "connectors": "Connectors",
+    "builtinConnectors": "Built-in",
+    "alwaysOn": "Always on",
+    "defaultBadge": "Default",
     "manageConnectors": "Manage connectors",
     "untitled": "Untitled"
   },
@@ -519,7 +555,20 @@
     "projects": "Projects",
     "documents": "Documents",
     "renameReview": "rename this tabular review",
-    "deleteReview": "delete this tabular review"
+    "deleteReview": "delete this tabular review",
+    "addSubfolder": "Add Subfolder",
+    "addDocuments": "Add Documents",
+    "name": "Name",
+    "type": "Type",
+    "size": "Size",
+    "version": "Version",
+    "created": "Created",
+    "updated": "Updated",
+    "newSubfolder": "New subfolder",
+    "newSubfolderInside": "New subfolder inside",
+    "renameFolder": "Rename folder",
+    "deleteFolder": "Delete folder",
+    "folderName": "Folder name"
   },
   "tabularReview": {
     "untitledReview": "Untitled Review",
@@ -644,6 +693,10 @@
     "appliedWorkflow": "Applied Workflow",
     "called": "Called",
     "failed": "Failed",
+    "webSearchSearching": "Searching the web",
+    "webSearchFound": "Web search {count, plural, =0 {— no results} one {— # source} other {— # sources}}",
+    "webSearchFailed": "Web search failed",
+    "webSearchVia": "via Eulex Web",
     "hideDetails": "Hide details",
     "showDetails": "Show details",
     "arguments": "Arguments",
@@ -693,6 +746,23 @@
     },
     "errors": {
       "generic": "Something went wrong. Please try again."
+    }
+  },
+  "changelog": {
+    "title": "What's new",
+    "description": "Recent features, improvements, and fixes in Max. Newest entries at the top.",
+    "loading": "Loading changelog…",
+    "empty": "No entries yet.",
+    "errors": {
+      "loadFailed": "Failed to load the changelog."
+    },
+    "types": {
+      "added": "New",
+      "improved": "Improved",
+      "changed": "Changed",
+      "fixed": "Fixed",
+      "removed": "Removed",
+      "security": "Security"
     }
   },
   "projectPicker": {

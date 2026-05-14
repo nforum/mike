@@ -12,6 +12,7 @@ import {
     type ChatMessage,
 } from "../lib/chatTools";
 import { getUserApiKeys } from "../lib/userSettings";
+import { recordLlmUsage } from "../lib/llmUsage";
 import { checkProjectAccess } from "../lib/access";
 import {
     closeMcpServers,
@@ -38,6 +39,7 @@ projectChatRouter.post("/", requireAuth, async (req, res) => {
         messages,
         chat_id,
         model,
+        effort,
         displayed_doc,
         attached_documents,
         client,
@@ -46,6 +48,10 @@ projectChatRouter.post("/", requireAuth, async (req, res) => {
         messages: ChatMessage[];
         chat_id?: string;
         model?: string;
+        // See chat.ts for `effort` — validated to "low" | "medium" |
+        // "high" before forwarding so a malformed client can't crash
+        // the provider.
+        effort?: string;
         displayed_doc?: { filename: string; document_id: string };
         attached_documents?: { filename: string; document_id: string }[];
         // See chat.ts for `client` / `editMode` semantics — same fields,
@@ -54,6 +60,10 @@ projectChatRouter.post("/", requireAuth, async (req, res) => {
         client?: "web" | "word";
         editMode?: "track" | "comments";
     };
+    const reasoningEffort: "low" | "medium" | "high" | undefined =
+        effort === "low" || effort === "medium" || effort === "high"
+            ? effort
+            : undefined;
 
     const db = createServerSupabase();
 
@@ -169,21 +179,40 @@ projectChatRouter.post("/", requireAuth, async (req, res) => {
     res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders();
 
+    // Disable Node's default 2-min request socket timeout — extended-thinking
+    // chats with multiple MCP rounds routinely exceed it. The Cloud Run
+    // service-level --timeout=3600 still bounds the overall lifetime.
+    if (typeof req.setTimeout === "function") req.setTimeout(0);
+    if (typeof res.setTimeout === "function") res.setTimeout(0);
+
     const write = (line: string) => res.write(line);
+
+    // SSE keep-alive heartbeat — see /chat/stream for the rationale.
+    const heartbeat = setInterval(() => {
+        try {
+            res.write(`: keepalive ${Date.now()}\n\n`);
+        } catch {
+            /* socket closed; cleared in finally */
+        }
+    }, 15_000);
+    req.on("close", () => clearInterval(heartbeat));
 
     const apiKeys = await getUserApiKeys(userId, db);
     // Per-user connectors come first so they win any slug collision in
     // findMcpServerForTool; built-in (system-side) MCPs follow.
     const [userMcpServers, builtinMcpServers] = await Promise.all([
         loadEnabledMcpServersForUser(userId, db),
-        loadBuiltinMcpServers(),
+        loadBuiltinMcpServers(userId, db),
     ]);
     const mcpServers = [...userMcpServers, ...builtinMcpServers];
+
+    const turnStartedAt = Date.now();
+    let usageRecorded = false;
 
     try {
         write(`data: ${JSON.stringify({ type: "chat_id", chatId })}\n\n`);
 
-        const { fullText, events } = await runLLMStream({
+        const { fullText, events, usage, selectedModel } = await runLLMStream({
             apiMessages,
             docStore,
             docIndex,
@@ -193,6 +222,7 @@ projectChatRouter.post("/", requireAuth, async (req, res) => {
             extraTools: PROJECT_EXTRA_TOOLS,
             workflowStore,
             model,
+            reasoningEffort,
             apiKeys,
             projectId,
             mcpServers,
@@ -201,12 +231,31 @@ projectChatRouter.post("/", requireAuth, async (req, res) => {
         });
 
         const annotations = extractAnnotations(fullText, docIndex, events);
-        await db.from("chat_messages").insert({
-            chat_id: chatId,
-            role: "assistant",
-            content: events.length ? events : null,
-            annotations: annotations.length ? annotations : null,
-        });
+        const { data: insertedAssistant } = await db
+            .from("chat_messages")
+            .insert({
+                chat_id: chatId,
+                role: "assistant",
+                content: events.length ? events : null,
+                annotations: annotations.length ? annotations : null,
+            })
+            .select("id")
+            .single();
+
+        if (usage) {
+            usageRecorded = true;
+            await recordLlmUsage({
+                userId,
+                provider: "claude",
+                model: selectedModel,
+                chatId,
+                projectId,
+                projectChatMessageId: insertedAssistant?.id ?? null,
+                usage,
+                durationMs: Date.now() - turnStartedAt,
+                status: "ok",
+            });
+        }
 
         if (!chatTitle && lastUser?.content) {
             await db
@@ -216,6 +265,30 @@ projectChatRouter.post("/", requireAuth, async (req, res) => {
         }
     } catch (err) {
         console.error("[project-chat/stream] error:", err);
+        if (!usageRecorded) {
+            try {
+                await recordLlmUsage({
+                    userId,
+                    provider: "claude",
+                    model: model ?? "unknown",
+                    chatId,
+                    projectId,
+                    usage: {
+                        inputTokens: 0,
+                        outputTokens: 0,
+                        cacheCreationInputTokens: 0,
+                        cacheReadInputTokens: 0,
+                        iterations: 0,
+                    },
+                    durationMs: Date.now() - turnStartedAt,
+                    status: "error",
+                    errorMessage:
+                        err instanceof Error ? err.message : String(err),
+                });
+            } catch {
+                /* recordLlmUsage already logs its own failures */
+            }
+        }
         try {
             write(
                 `data: ${JSON.stringify({ type: "error", message: "Stream error" })}\n\n`,
@@ -225,6 +298,7 @@ projectChatRouter.post("/", requireAuth, async (req, res) => {
             /* ignore */
         }
     } finally {
+        clearInterval(heartbeat);
         await closeMcpServers(mcpServers);
         res.end();
     }

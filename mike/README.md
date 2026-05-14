@@ -6,13 +6,21 @@ poslužitelja koje Max učitava automatski na svakom chat requestu.
 Za razliku od konektora koje korisnik dodaje preko UI-ja
 (`Postavke → Konektori`, tablica `user_mcp_servers`), serveri definirani ovdje:
 
-- **Ne pojavljuju** se u UI-ju i ne mogu se ugasiti per-korisnik.
+- **Pojavljuju** se kao zadani konektori u korisničkom UI-ju (`Postavke →
+  Konektori` i chat dropdown s utičnicom), s "Zadano" badge-om uz naziv.
+  Defaultno su uključeni; korisnik ih može isključiti per-konto. Opt-out se
+  pamti u tablici `user_mcp_builtin_prefs` (samo `(user_id, slug, enabled)`).
+- **URL i headeri** ostaju server-side — nikad se ne šalju browseru ni ne
+  upisuju u `user_mcp_servers`. Korisnik ih ne može mijenjati.
 - **Ne traže OAuth flow** — autoriziraju se isključivo preko statičkih `headers`.
-- **Vrijede globalno** (svi korisnici dobivaju njihove alate u chatu).
-- **Ne završavaju u bazi** — žive samo u JSON-u na disku.
+- **Vrijede globalno** (svi korisnici dobivaju njihove alate u chatu osim
+  onih koji su ih eksplicitno isključili).
+- **Konfiguracija ne završava u bazi** — žive samo u JSON-u na disku;
+  promjena `mcp.json` se odmah propagira svim korisnicima.
 
-Koristi ih za uvijek-uključene organizacijske integracije (npr. interni search,
-docs proxy) koje ne želiš izlagati kao izborne konektore.
+Koristi ih za uvijek-dostupne organizacijske integracije (npr. interni search,
+docs proxy, Zakon.ai) koje želiš da svaki korisnik ima out-of-the-box ali smije
+ugasiti ako mu smetaju u kontekstu.
 
 ## Lokacija datoteke
 

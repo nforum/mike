@@ -18,6 +18,13 @@ interface UserProfile {
     creditsRemaining: number;
     tier: string;
     tabularModel: string;
+    /**
+     * User's reasoning-intensity preference for the main composer
+     * (Brain icon picker). Persisted in `user_profiles.reasoning_effort`
+     * (migration 113) so it survives reloads, sign-outs, and switching
+     * devices. Maps 1:1 to provider-native effort/level params.
+     */
+    reasoningEffort: "low" | "medium" | "high";
     claudeApiKey: string | null;
     geminiApiKey: string | null;
     openaiApiKey: string | null;
@@ -44,6 +51,16 @@ interface UserProfileContextType {
     updateModelPreference: (
         field: "tabularModel",
         value: string,
+    ) => Promise<boolean>;
+    /**
+     * Persist the user's reasoning-effort pick to `user_profiles`.
+     * Local state flips immediately; the PATCH is fire-and-forget so
+     * the picker stays snappy. Returns true on success, false on
+     * network error (UI doesn't block on this — the user's pick still
+     * applies to the in-flight request via the message payload).
+     */
+    updateReasoningEffort: (
+        value: "low" | "medium" | "high",
     ) => Promise<boolean>;
     updateApiKey: (
         provider: "claude" | "gemini" | "openai" | "mistral",
@@ -92,6 +109,11 @@ async function patchProfile(updates: Record<string, any>): Promise<void> {
 
 function mapServerProfile(data: any): UserProfile {
     const creditsUsed = data.message_credits_used ?? 0;
+    const rawEffort = data.reasoning_effort;
+    const reasoningEffort: "low" | "medium" | "high" =
+        rawEffort === "low" || rawEffort === "medium" || rawEffort === "high"
+            ? rawEffort
+            : "high";
     return {
         displayName: data.display_name ?? null,
         organisation: data.organisation ?? null,
@@ -101,7 +123,8 @@ function mapServerProfile(data: any): UserProfile {
             new Date(Date.now() + 30 * 86400000).toISOString(),
         creditsRemaining: MONTHLY_CREDIT_LIMIT - creditsUsed,
         tier: data.tier || "Free",
-        tabularModel: data.tabular_model || "gemini-3-flash-preview",
+        tabularModel: data.tabular_model || "claude-sonnet-4-6",
+        reasoningEffort,
         claudeApiKey: data.claude_api_key ?? null,
         geminiApiKey: data.gemini_api_key ?? null,
         openaiApiKey: data.openai_api_key ?? null,
@@ -122,7 +145,8 @@ const DEFAULT_PROFILE: UserProfile = {
     creditsResetDate: new Date(Date.now() + 30 * 86400000).toISOString(),
     creditsRemaining: MONTHLY_CREDIT_LIMIT,
     tier: "Free",
-    tabularModel: "gemini-3-flash-preview",
+    tabularModel: "claude-sonnet-4-6",
+    reasoningEffort: "high",
     claudeApiKey: null,
     geminiApiKey: null,
     openaiApiKey: null,
@@ -237,6 +261,25 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
         [user],
     );
 
+    const updateReasoningEffort = useCallback(
+        async (value: "low" | "medium" | "high"): Promise<boolean> => {
+            if (!user) return false;
+            // Optimistic local update so the picker doesn't lag on the
+            // network round-trip — backend validates the value too
+            // (CHECK constraint + route guard) so we won't desync.
+            setProfile((prev) =>
+                prev ? { ...prev, reasoningEffort: value } : null,
+            );
+            try {
+                await patchProfile({ reasoning_effort: value });
+                return true;
+            } catch {
+                return false;
+            }
+        },
+        [user],
+    );
+
     const updateApiKey = useCallback(
         async (
             provider: "claude" | "gemini" | "openai" | "mistral",
@@ -309,6 +352,7 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
                 updateDisplayName,
                 updateOrganisation,
                 updateModelPreference,
+                updateReasoningEffort,
                 updateApiKey,
                 reloadProfile,
                 incrementMessageCredits,

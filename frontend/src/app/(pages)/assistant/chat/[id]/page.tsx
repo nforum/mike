@@ -69,6 +69,13 @@ export default function AssistantChatPage() {
             cancel={cancel}
             chatId={id}
             chatTitle={chatTitle}
+            onFlagChange={(mid, flagged) =>
+                setMessages((prev) =>
+                    prev.map((m) =>
+                        m.id === mid ? { ...m, flagged } : m,
+                    ),
+                )
+            }
         />
     );
 }

@@ -64,6 +64,20 @@ function toOpenAITools(
 // Streaming
 // ---------------------------------------------------------------------------
 
+// Models that accept the GPT-5/o-series `reasoning_effort` parameter.
+// Sending it to a non-reasoning model (e.g. gpt-5.4-nano if treated as
+// non-reasoning, or local models) returns a 400. LocalLLM is always off
+// because vLLM doesn't surface reasoning_effort uniformly.
+function supportsReasoningEffort(model: string): boolean {
+    if (model.startsWith("localllm")) return false;
+    return (
+        model.startsWith("gpt-5") ||
+        model.startsWith("o1") ||
+        model.startsWith("o3") ||
+        model.startsWith("o4")
+    );
+}
+
 export async function streamOpenAI(
     params: StreamChatParams,
 ): Promise<StreamChatResult> {
@@ -74,11 +88,15 @@ export async function streamOpenAI(
         callbacks = {},
         runTools,
         apiKeys,
+        reasoningEffort,
     } = params;
     const maxIter = params.maxIterations ?? 10;
     const actualModel = getActualModelName(model);
     const client = getClient(model, apiKeys?.openai);
     const openaiTools = toOpenAITools(tools);
+    const effortParam = supportsReasoningEffort(model)
+        ? { reasoning_effort: reasoningEffort ?? "high" }
+        : {};
 
     if (isLocalModel(model)) {
         console.log("[localllm] streaming request:", {
@@ -106,6 +124,7 @@ export async function streamOpenAI(
                 messages,
                 tools: openaiTools,
                 stream: true,
+                ...(effortParam as Record<string, unknown>),
             });
 
             const textParts: string[] = [];

@@ -322,7 +322,7 @@ function redirectToFrontend(
     // toast / refreshes its connector list.
     const base =
         process.env.FRONTEND_URL?.trim() ||
-        "https://mike-frontend-cc6nrgescq-ew.a.run.app";
+        "https://max.eulex.ai";
     const qs = new URLSearchParams({
         integration: params.provider,
         ok: params.ok ? "1" : "0",

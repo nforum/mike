@@ -34,7 +34,10 @@ export const MODELS: ModelOption[] = [
     },
 ];
 
-export const DEFAULT_MODEL_ID = "gemini-3-flash-preview";
+// Primary model. Backend ships with a server-level Anthropic key (via Secret
+// Manager) so the add-in defaults to Claude Sonnet 4.6 even before the user
+// has pasted their own key in /account/models.
+export const DEFAULT_MODEL_ID = "claude-sonnet-4-6";
 export const MODEL_STORAGE_KEY = "mike.lastModel";
 
 type Availability = { anthropic: boolean; gemini: boolean };

@@ -9,8 +9,58 @@ import { requireAuth } from "../middleware/auth";
 import { createServerSupabase } from "../lib/supabase";
 import { McpHttpClient } from "../lib/mcp/client";
 import { DbOAuthProvider } from "../lib/mcp/oauth";
+import {
+    listBuiltinMcpEntriesForUser,
+    setBuiltinMcpEnabled,
+} from "../lib/mcp/builtin";
 
 export const mcpServersRouter = Router();
+export const builtinMcpRouter = Router();
+
+// GET /builtin-mcp-servers — list built-in (server-side) MCP servers with
+// the EFFECTIVE per-user enabled flag. Defaults to enabled; reflects any
+// opt-out the user has saved via PATCH below. URL and auth headers are
+// stripped from the response — those live only on disk in mike/mcp.json.
+builtinMcpRouter.get("/", requireAuth, async (_req, res) => {
+    const userId = res.locals.userId as string;
+    const db = createServerSupabase();
+    try {
+        const entries = await listBuiltinMcpEntriesForUser(userId, db);
+        res.json(
+            entries.map((e) => ({
+                slug: e.slug,
+                name: e.name,
+                enabled: e.enabled,
+            })),
+        );
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[builtin-mcp] failed to list entries: ${msg}`);
+        res.json([]);
+    }
+});
+
+// PATCH /builtin-mcp-servers/:slug — toggle a built-in connector for the
+// caller. Body: `{ enabled: boolean }`. Defaults are server-side (enabled
+// for everyone); this writes ONLY the deviation into
+// `user_mcp_builtin_prefs`. The chat dispatcher consults the same table
+// on the next request.
+builtinMcpRouter.patch("/:slug", requireAuth, async (req, res) => {
+    const userId = res.locals.userId as string;
+    const { slug } = req.params;
+    const body = (req.body ?? {}) as { enabled?: unknown };
+    if (typeof body.enabled !== "boolean") {
+        return void res
+            .status(400)
+            .json({ detail: "body.enabled must be a boolean" });
+    }
+    const result = await setBuiltinMcpEnabled(userId, slug, body.enabled);
+    if (!result.ok) {
+        const status = /unknown built-in/i.test(result.error) ? 404 : 500;
+        return void res.status(status).json({ detail: result.error });
+    }
+    res.json({ slug, enabled: result.enabled });
+});
 
 const SLUG_RE = /^[a-z0-9_-]{1,24}$/;
 const NAME_MAX = 80;

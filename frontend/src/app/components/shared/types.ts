@@ -153,18 +153,69 @@ export type AssistantEvent =
         error?: string;
         isStreaming?: boolean;
     }
+  | {
+        /**
+         * Live `web_search` tool call kicked off by the LLM. Emitted before
+         * the provider round-trip so the UI can show a "Searching the web…"
+         * affordance immediately. Replaced/merged with `web_search_result`
+         * once results land (matched by `query` so concurrent searches
+         * don't collide).
+         */
+        type: "web_search_started";
+        query: string;
+        provider: string;
+        isStreaming?: boolean;
+    }
+  | {
+        /**
+         * Final `web_search` tool result — surfaced as a "Sources" panel
+         * the user can click through. `error` is set when the provider
+         * round-trip failed; `results` is empty in that case.
+         */
+        type: "web_search_result";
+        query: string;
+        provider: string;
+        results: {
+            title: string;
+            url: string;
+            snippet: string;
+            published_date: string | null;
+        }[];
+        error: string | null;
+        isStreaming?: boolean;
+    }
   | { type: "content"; text: string; isStreaming?: boolean };
 
 export interface MikeMessage {
+  /**
+   * Server-assigned chat_messages.id. Present after the message has been
+   * persisted by the backend (set from the `message_id` stream event for
+   * fresh assistant turns, or from `getChat` for historical loads).
+   * Powers per-message actions like flag/unflag and analytics.
+   */
+  id?: string;
   role: "user" | "assistant";
   content: string;
   files?: { filename: string; document_id?: string }[];
   workflow?: { id: string; title: string };
   model?: string;
+  /**
+   * Reasoning intensity selected for this turn. Only sent when the
+   * picked model exposes a reasoning dial (Claude 4.x, GPT-5, Gemini
+   * 3.x); the backend silently ignores it for everything else.
+   */
+  effort?: "low" | "medium" | "high";
   annotations?: MikeCitationAnnotation[];
   events?: AssistantEvent[];
   /** Set when streaming failed; rendered as a red error block. */
   error?: string;
+  /**
+   * "Not appropriate answer" flag — mirrors chat_messages.is_flagged.
+   * Toggled via POST /chat/messages/:id/flag; we keep a denormalised
+   * boolean on the message so the UI can render the active flag state
+   * without an extra round-trip.
+   */
+  flagged?: boolean;
 }
 
 export interface CitationQuote {

@@ -68,7 +68,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput(
         id: string;
         title: string;
     } | null>(null);
-    const [model, setModel] = useSelectedModel();
+    const [model, setModel, effort, setEffort] = useSelectedModel();
     const { profile } = useUserProfile();
     const apiKeys = {
         claudeApiKey: profile?.claudeApiKey ?? null,
@@ -145,6 +145,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput(
             files: files.length > 0 ? files : undefined,
             workflow: wf ?? undefined,
             model,
+            effort,
         });
     };
 
@@ -284,6 +285,8 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput(
                             <ModelToggle
                                 value={model}
                                 onChange={setModel}
+                                effort={effort}
+                                onEffortChange={setEffort}
                                 apiKeys={apiKeys}
                             />
                             <button

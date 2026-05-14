@@ -13,7 +13,7 @@ interface InitialViewProps {
     onSubmit: (message: MikeMessage) => void;
 }
 
-const ICON_SIZE = 35;
+const ICON_SIZE = 44;
 const GAP = 16; // gap-4 = 1rem = 16px
 
 export function InitialView({ onSubmit }: InitialViewProps) {

@@ -10,6 +10,15 @@ build
 !.env.example
 !.env.local.example
 
+# MCP server config — may contain secrets; track the .example instead
+mike/mcp.json
+!mike/mcp.json.example
+
+# Staged copy of mike/mcp.json that the deploy scripts drop into the
+# backend Docker build context. Always rebuilt by cloudbuild.yaml /
+# scripts/deploy.sh; never commit it.
+backend/mike/
+
 *.log
 *.tsbuildinfo
 next-env.d.ts

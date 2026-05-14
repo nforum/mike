@@ -128,11 +128,11 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
                     <div className="px-2.5">
                         <Link
                             href="/assistant"
-                            className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+                            className="flex items-center gap-2 hover:opacity-80 transition-opacity leading-none"
                         >
-                            <MikeIcon size={22} />
+                            <MikeIcon size={30} />
                             <span
-                                className={`text-2xl font-light font-serif ${
+                                className={`text-2xl font-light font-serif leading-none ${
                                     shouldAnimate ? "sidebar-fade-in" : ""
                                 }`}
                             >

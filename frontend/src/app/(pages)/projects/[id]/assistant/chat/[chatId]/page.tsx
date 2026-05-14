@@ -16,7 +16,6 @@ import {
     FileText,
     Loader2,
     Plus,
-    Share2,
     Trash2,
     Upload,
     X,
@@ -88,7 +87,7 @@ function isDocxTab(filename: string) {
     return ext === "docx" || ext === "doc";
 }
 
-const ICON_SIZE = 30;
+const ICON_SIZE = 38;
 const GAP = 14;
 const EXPLORER_MIN = 160;
 const EXPLORER_DEFAULT = 280;
@@ -207,7 +206,6 @@ export default function ProjectAssistantChatPage({ params }: Props) {
     const { user } = useAuth();
     const { profile } = useUserProfile();
     const tDelete = useTranslations("confirmDelete");
-    const tShare = useTranslations("shareChat");
     const { confirm: confirmDialog, dialog: confirmDialogEl } =
         useConfirmDialog();
     const username =
@@ -817,13 +815,6 @@ export default function ProjectAssistantChatPage({ params }: Props) {
                 </div>
                 <div className="flex items-center gap-2">
                     <button
-                        onClick={() => setShareOpen(true)}
-                        title={tShare("title")}
-                        className="flex items-center justify-center p-1.5 text-gray-500 hover:text-gray-900 transition-colors"
-                    >
-                        <Share2 className="h-4 w-4" />
-                    </button>
-                    <button
                         onClick={handleNewChat}
                         disabled={creatingChat}
                         title="New chat"
@@ -1231,6 +1222,27 @@ export default function ProjectAssistantChatPage({ params }: Props) {
                                             onEditError={handleEditError}
                                             isDocReloading={(docId) =>
                                                 reloadingDocIds.has(docId)
+                                            }
+                                            isLast={i === lastAssistantIdx}
+                                            onShareClick={() =>
+                                                setShareOpen(true)
+                                            }
+                                            messageId={msg.id}
+                                            flagged={!!msg.flagged}
+                                            onFlagChange={(
+                                                mid,
+                                                flagged,
+                                            ) =>
+                                                setMessages((prev) =>
+                                                    prev.map((m) =>
+                                                        m.id === mid
+                                                            ? {
+                                                                  ...m,
+                                                                  flagged,
+                                                              }
+                                                            : m,
+                                                    ),
+                                                )
                                             }
                                         />
                                     ),

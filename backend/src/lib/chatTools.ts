@@ -91,18 +91,35 @@ export type ChatMessage = {
  * grounding instruction so the model says "Grounding by Eulex.ai"
  * instead of leaking internal slugs / tool names.
  *
- * Heuristic: take the URL host, strip a leading "mcp.", "api.", "rpc.",
- * or "connector." subdomain (these are server placement details, not
- * brand). Title-case the first label so "eulex.ai" → "Eulex.ai".
- *
- * Falls back to row.name when the URL parses but yields nothing useful
- * (e.g. an IP address), and to row.slug as a last resort.
+ * Resolution order:
+ *   1. `row.name` — when the operator has set a human-readable label
+ *      (e.g. "LDH World" in mike/mcp.json or via the connector form).
+ *      We accept anything that looks intentional — i.e. NOT equal to
+ *      the slug and not slug-shaped (lowercase + dashes/underscores
+ *      only). That way users get the brand they typed verbatim.
+ *   2. URL-host title-case fallback — strip a leading "mcp.", "api.",
+ *      "rpc.", or "connector." subdomain (these are placement details,
+ *      not brand) and title-case the first label so "eulex.ai" → "Eulex.ai".
+ *      Used when the row has no name or a slug-shaped placeholder name.
+ *   3. `row.name` even if slug-shaped, then `row.slug`, then "MCP".
  */
 export function mcpBrandLabel(row: {
     url?: string | null;
     name?: string | null;
     slug?: string | null;
 }): string {
+    const trimmedName = row.name?.trim();
+    const trimmedSlug = row.slug?.trim();
+    // A "human" name is anything the operator typed that isn't just a
+    // copy of the slug. The slug-shape check catches forms that auto-fill
+    // name=slug (e.g. "legal-data-hunter").
+    const nameLooksHuman =
+        !!trimmedName &&
+        trimmedName !== trimmedSlug &&
+        !/^[a-z0-9_-]+$/.test(trimmedName);
+
+    if (nameLooksHuman) return trimmedName;
+
     const fromUrl = (() => {
         try {
             if (!row.url) return null;
@@ -120,7 +137,8 @@ export function mcpBrandLabel(row: {
             return null;
         }
     })();
-    return fromUrl || row.name || row.slug || "MCP";
+
+    return fromUrl || trimmedName || trimmedSlug || "MCP";
 }
 
 export const SYSTEM_PROMPT = `You are Max, an AI legal assistant that helps lawyers and legal professionals analyze documents, answer legal questions, and draft legal documents.
@@ -2683,6 +2701,14 @@ export async function runLLMStream(params: {
     tabularStore?: TabularCellStore;
     buildCitations?: (fullText: string) => unknown[];
     model?: string;
+    /**
+     * User-selected reasoning intensity for this turn. Forwarded to
+     * Claude (`output_config.effort`), GPT-5 (`reasoning_effort`), and
+     * Gemini (`thinkingConfig.thinkingLevel`). Mistral / LocalLLM
+     * silently ignore it. Defaults to "high" to preserve the legacy
+     * behavior we shipped before the picker existed.
+     */
+    reasoningEffort?: import("./llm").ReasoningEffort;
     apiKeys?: import("./llm").UserApiKeys;
     /**
      * If set, generate_docx will attach created docs to this project so
@@ -2713,8 +2739,19 @@ export async function runLLMStream(params: {
      * (`applyTrackedChangeWithComment` vs `insertCommentAtRange`).
      */
     editMode?: "track" | "comments";
-}): Promise<{ fullText: string; events: AssistantEvent[] }> {
-    const { apiMessages, docStore, docIndex, userId, db, write, extraTools, workflowStore, tabularStore, buildCitations, model, apiKeys, projectId, mcpServers, client, editMode } = params;
+}): Promise<{
+    fullText: string;
+    events: AssistantEvent[];
+    /**
+     * Token usage summed across the whole tool-use loop, plus the model
+     * actually selected for this turn. Caller persists this to
+     * llm_usage and computes USD via lib/llmUsage.computeCostUsd. Only
+     * present for providers that report usage (Claude today).
+     */
+    usage?: import("./llm").LlmUsage;
+    selectedModel: string;
+}> {
+    const { apiMessages, docStore, docIndex, userId, db, write, extraTools, workflowStore, tabularStore, buildCitations, model, reasoningEffort, apiKeys, projectId, mcpServers, client, editMode } = params;
     const editModeForClient = editMode ?? "track";
     const isWordClient = client === "word";
     const mcpTools = (mcpServers ?? []).flatMap((s) => s.tools);
@@ -2885,7 +2922,7 @@ export async function runLLMStream(params: {
     // wired up server-side.
     const selectedModel = resolveModel(model, resolveDefaultMainModel(apiKeys ?? {}));
 
-    await streamChatWithTools({
+    const streamResult = await streamChatWithTools({
         model: selectedModel,
         systemPrompt,
         messages: chatMessages,
@@ -2893,6 +2930,7 @@ export async function runLLMStream(params: {
         maxIterations: 10,
         apiKeys,
         enableThinking: true,
+        reasoningEffort,
         callbacks: {
             onContentDelta: (delta) => {
                 iterText += delta;
@@ -3077,7 +3115,7 @@ export async function runLLMStream(params: {
     write(`data: ${JSON.stringify({ type: "citations", citations })}\n\n`);
     write("data: [DONE]\n\n");
 
-    return { fullText, events };
+    return { fullText, events, usage: streamResult.usage, selectedModel };
 }
 
 // ---------------------------------------------------------------------------

@@ -19,6 +19,18 @@
     "copy": "Kopiraj",
     "copied": "Kopirano"
   },
+  "messageActions": {
+    "print": "Ispiši",
+    "exportPdf": "Izvezi u PDF",
+    "flagTooltip": "Neprimjeren odgovor",
+    "unflagTooltip": "Ukloni oznaku",
+    "documentTitle": "Odgovor Max asistenta",
+    "brandLabel": "Max — pravni AI asistent",
+    "generatedOn": "Generirano",
+    "watermark": "Povjerljivo · Za internu uporabu",
+    "marketingTagline": "Pouzdana umjetna inteligencija za pravnu izvrsnost",
+    "disclaimer": "AI može pogriješiti. Odgovori ne predstavljaju pravni savjet."
+  },
   "sidebar": {
     "assistant": "Asistent",
     "projects": "Predmeti",
@@ -43,7 +55,8 @@
     "google": "Google",
     "linkedIn": "LinkedIn",
     "noAccount": "Prijavite se s vašim EULEX računom. Nemate ga?",
-    "createAccount": "Otvorite račun"
+    "createAccount": "Otvorite račun",
+    "legalNotice": "Prijavom potvrđujete da prihvaćate <terms>uvjete korištenja</terms> i <privacy>politiku privatnosti</privacy> na eulex.ai te da imate najmanje 18 godina."
   },
   "signup": {
     "title": "Otvorite račun",
@@ -62,7 +75,8 @@
       "models": "Modeli i API ključevi",
       "connectors": "Konektori",
       "fileSources": "Izvori datoteka",
-      "wordAddin": "Word dodatak"
+      "wordAddin": "Word dodatak",
+      "changelog": "Novosti"
     },
     "profile": {
       "title": "Profil",
@@ -124,6 +138,9 @@
     },
     "loadingServers": "Učitavanje servera…",
     "noConnectors": "Još nema konfiguriranih konektora.",
+    "builtinTitle": "Ugrađeni konektori",
+    "builtinAlwaysOn": "Uvijek uključeno",
+    "customTitle": "Vaši konektori",
     "addForm": {
       "name": "Naziv",
       "namePlaceholder": "Moj konektor",
@@ -157,7 +174,9 @@
       "discoveredTools": "Otkriveno {count} alat{count, plural, one {} few {a} other {a}}",
       "hide": "Sakrij",
       "show": "Prikaži",
-      "deleteServer": "Obriši server"
+      "deleteServer": "Obriši server",
+      "defaultBadge": "Zadano",
+      "builtinHint": "Predefinirani konektor — možete ga isključiti, ali konfiguraciju održava administrator."
     },
     "confirm": {
       "removeTitle": "Ukloni konektor",
@@ -186,12 +205,26 @@
   "assistant": {
     "greeting": "Pozdrav, {username}",
     "disclaimer": "AI može pogriješiti. Odgovori ne predstavljaju pravni savjet.",
-    "placeholder": "Postavite pitanje o vašim dokumentima...",
+    "placeholder": "Postavite pitanje...",
     "projects": "Predmeti",
     "workflows": "Radni tijekovi",
     "addDocuments": "Dodaj dokumente",
     "openProjects": "Otvori predmete",
-    "openWorkflows": "Otvori radne tijekove"
+    "openWorkflows": "Otvori radne tijekove",
+    "modelToggle": {
+      "trigger": "Model: {model}",
+      "triggerAria": "Odaberi model i razinu razmišljanja. Trenutno {model}.",
+      "apiKeyMissingTitle": "Nedostaje API ključ za odabrani model",
+      "effort": {
+        "label": "Razina razmišljanja",
+        "low": "Niska",
+        "medium": "Srednja",
+        "high": "Visoka",
+        "lowTitle": "Brže i jeftinije. Minimalno razmišljanje prije odgovora.",
+        "mediumTitle": "Uravnoteženo. Umjerena količina razmišljanja prije odgovora.",
+        "highTitle": "Najdublje razmišljanje. Sporije i skuplje, najbolje za teške zadatke."
+      }
+    }
   },
   "projects": {
     "title": "Predmeti",
@@ -507,6 +540,9 @@
     "loadingConnectors": "Učitavanje konektora",
     "connectorStatus": "{enabled} od {total} konektora omogućeno",
     "connectors": "Konektori",
+    "builtinConnectors": "Ugrađeni",
+    "alwaysOn": "Uvijek uključeno",
+    "defaultBadge": "Zadano",
     "manageConnectors": "Upravljaj konektorima",
     "untitled": "Bez naziva"
   },
@@ -519,7 +555,20 @@
     "projects": "Predmeti",
     "documents": "Dokumenti",
     "renameReview": "preimenovati ovaj tablični pregled",
-    "deleteReview": "obrisati ovaj tablični pregled"
+    "deleteReview": "obrisati ovaj tablični pregled",
+    "addSubfolder": "Dodaj podmapu",
+    "addDocuments": "Dodaj dokumente",
+    "name": "Naziv",
+    "type": "Vrsta",
+    "size": "Veličina",
+    "version": "Verzija",
+    "created": "Stvoreno",
+    "updated": "Ažurirano",
+    "newSubfolder": "Nova podmapa",
+    "newSubfolderInside": "Nova podmapa unutar",
+    "renameFolder": "Preimenuj mapu",
+    "deleteFolder": "Obriši mapu",
+    "folderName": "Naziv mape"
   },
   "tabularReview": {
     "untitledReview": "Pregled bez naslova",
@@ -644,6 +693,10 @@
     "appliedWorkflow": "Primijenjen radni tijek",
     "called": "Pozvano",
     "failed": "Neuspješno",
+    "webSearchSearching": "Pretražujem web",
+    "webSearchFound": "Web pretraga {count, plural, =0 {— bez rezultata} one {— # izvor} few {— # izvora} other {— # izvora}}",
+    "webSearchFailed": "Web pretraga nije uspjela",
+    "webSearchVia": "preko Eulex Web",
     "hideDetails": "Sakrij detalje",
     "showDetails": "Prikaži detalje",
     "arguments": "Argumenti",
@@ -693,6 +746,23 @@
     },
     "errors": {
       "generic": "Nešto je pošlo po krivu. Pokušajte ponovno."
+    }
+  },
+  "changelog": {
+    "title": "Novosti",
+    "description": "Pregled novih značajki, poboljšanja i ispravaka u Maxu. Najnovije izmjene su na vrhu.",
+    "loading": "Učitavanje novosti…",
+    "empty": "Još nema unosa.",
+    "errors": {
+      "loadFailed": "Učitavanje novosti nije uspjelo."
+    },
+    "types": {
+      "added": "Novo",
+      "improved": "Poboljšano",
+      "changed": "Izmijenjeno",
+      "fixed": "Ispravljeno",
+      "removed": "Uklonjeno",
+      "security": "Sigurnost"
     }
   },
   "projectPicker": {

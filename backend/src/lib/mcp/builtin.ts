@@ -20,13 +20,18 @@ import { promises as fs } from "fs";
 import path from "path";
 import { createHash } from "crypto";
 import type { OpenAIToolSchema } from "../llm/types";
+import type { createServerSupabase } from "../supabase";
+import { query } from "../db";
 import { McpHttpClient } from "./client";
 import { prefixedToolName } from "./servers";
 import type { LoadedMcpServer, McpServerRow } from "./types";
+import { mintEulexPartnerToken, isEulexPartnerConfigured } from "./partnerJwt";
 
 const SLUG_RE = /^[a-z0-9_-]{1,20}$/;
 const BUILTIN_SLUG_PREFIX = "sys-";
 const ENV_VAR_RE = /\$\{([A-Z0-9_]+)\}/g;
+
+type Db = ReturnType<typeof createServerSupabase>;
 
 type BuiltinMcpEntry = {
     name?: string;
@@ -54,6 +59,28 @@ type Cache = {
 
 let cache: Cache | null = null;
 let missLogged = false;
+
+// ---------------------------------------------------------------------------
+// Hardcoded partner connector: EULEX
+// ---------------------------------------------------------------------------
+// Eulex is NOT in mcp.json — it uses a dynamically minted partner JWT per user
+// instead of a static header. When MAX_EULEX_PARTNER_SECRET is set, this
+// function returns a ParsedEntry with a freshly minted Bearer token.
+
+const EULEX_SLUG = `${BUILTIN_SLUG_PREFIX}eulex`;
+const EULEX_NAME = "Eulex.ai";
+const EULEX_URL = "https://mcp.eulex.ai/mcp";
+
+function buildEulexPartnerEntry(userId: string): ParsedEntry | null {
+    const token = mintEulexPartnerToken(userId);
+    if (!token) return null;
+    return {
+        slug: EULEX_SLUG,
+        name: EULEX_NAME,
+        url: EULEX_URL,
+        headers: { Authorization: `Bearer ${token}` },
+    };
+}
 
 function candidatePaths(): string[] {
     const out: string[] = [];
@@ -221,14 +248,53 @@ function stubRow(e: ParsedEntry): McpServerRow {
 }
 
 /**
- * Open Streamable-HTTP clients for every enabled built-in server, list their
- * tools, and return them in Max's standard `LoadedMcpServer` shape so the
- * chat handler can concatenate them with the per-user connectors.
+ * Read the user's per-builtin opt-out map. Absent rows mean the connector
+ * is enabled (default). Returns a Map<slug, enabled> containing only the
+ * explicit overrides — callers should treat any missing slug as `true`.
  *
- * Failures are isolated per server: a misbehaving builtin logs a warning and
- * is dropped from the result; the rest still load. Never throws.
+ * Resilient on purpose: a DB hiccup must not block chat. Returns an empty
+ * map (= everything default-enabled) if the lookup fails.
  */
-export async function loadBuiltinMcpServers(): Promise<LoadedMcpServer[]> {
+async function readUserBuiltinPrefs(
+    userId: string,
+    db: Db,
+): Promise<Map<string, boolean>> {
+    try {
+        const { data, error } = await db
+            .from("user_mcp_builtin_prefs")
+            .select("slug, enabled")
+            .eq("user_id", userId);
+        if (error || !data) return new Map();
+        const out = new Map<string, boolean>();
+        for (const row of data as { slug: string; enabled: boolean }[]) {
+            out.set(row.slug, row.enabled === true);
+        }
+        return out;
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[mcp-builtin] prefs lookup failed for ${userId}: ${msg}`);
+        return new Map();
+    }
+}
+
+/**
+ * Open Streamable-HTTP clients for every built-in server the user has
+ * enabled, list their tools, and return them in Max's standard
+ * `LoadedMcpServer` shape so the chat handler can concatenate them with
+ * the per-user connectors.
+ *
+ * Per-user filter: each builtin defaults to enabled; a row in
+ * `user_mcp_builtin_prefs` with `enabled = false` opts the user out of
+ * that specific connector for every chat request. When `userId`/`db` are
+ * omitted (e.g. tests), all configured builtins load.
+ *
+ * Failures are isolated per server: a misbehaving builtin logs a warning
+ * and is dropped from the result; the rest still load. Never throws.
+ */
+export async function loadBuiltinMcpServers(
+    userId?: string,
+    db?: Db,
+): Promise<LoadedMcpServer[]> {
     let entries: ParsedEntry[];
     try {
         entries = await loadConfig();
@@ -237,7 +303,21 @@ export async function loadBuiltinMcpServers(): Promise<LoadedMcpServer[]> {
         console.warn(`[mcp-builtin] config load failed: ${msg}`);
         return [];
     }
+
+    // Inject the EULEX partner connector (hardcoded, not from mcp.json).
+    // Requires MAX_EULEX_PARTNER_SECRET and a userId for JWT minting.
+    if (userId && isEulexPartnerConfigured()) {
+        const eulexEntry = buildEulexPartnerEntry(userId);
+        if (eulexEntry) entries = [...entries, eulexEntry];
+    }
+
     if (entries.length === 0) return [];
+
+    if (userId && db) {
+        const prefs = await readUserBuiltinPrefs(userId, db);
+        entries = entries.filter((e) => prefs.get(e.slug) !== false);
+        if (entries.length === 0) return [];
+    }
 
     const settled = await Promise.allSettled(
         entries.map(async (e) => {
@@ -292,4 +372,108 @@ export async function loadBuiltinMcpServers(): Promise<LoadedMcpServer[]> {
         }
     }
     return out;
+}
+
+export type BuiltinEntrySummary = {
+    slug: string;
+    name: string;
+    url: string;
+    enabled: boolean;
+};
+
+/**
+ * Return lightweight metadata for every configured built-in server (no
+ * network calls). The `enabled` flag is the EFFECTIVE per-user state:
+ * defaults to true for every parsed entry, flipped to false only when
+ * the user has an explicit opt-out row in `user_mcp_builtin_prefs`.
+ *
+ * URL is included for diagnostics callers; the public HTTP route strips
+ * it before returning to the browser since URLs may carry secrets.
+ */
+export async function listBuiltinMcpEntriesForUser(
+    userId?: string,
+    db?: Db,
+): Promise<BuiltinEntrySummary[]> {
+    let entries: ParsedEntry[];
+    try {
+        entries = await loadConfig();
+    } catch {
+        return [];
+    }
+
+    // Inject EULEX partner entry so the frontend shows it in the
+    // built-in connectors list even though it's not in mcp.json.
+    if (isEulexPartnerConfigured()) {
+        entries = [
+            ...entries,
+            {
+                slug: EULEX_SLUG,
+                name: EULEX_NAME,
+                url: EULEX_URL,
+                headers: {},
+            },
+        ];
+    }
+
+    const prefs =
+        userId && db ? await readUserBuiltinPrefs(userId, db) : new Map<string, boolean>();
+    return entries.map((e) => ({
+        slug: e.slug, // already includes the 'sys-' prefix from parseFile
+        name: e.name,
+        url: e.url,
+        enabled: prefs.get(e.slug) !== false,
+    }));
+}
+
+/** @deprecated Use `listBuiltinMcpEntriesForUser` so per-user toggles are honored. */
+export async function listBuiltinMcpEntries(): Promise<BuiltinEntrySummary[]> {
+    return listBuiltinMcpEntriesForUser();
+}
+
+/**
+ * Persist a user's enable/disable choice for a single built-in connector.
+ *
+ * Validates the slug against the parsed mcp.json so the table never grows
+ * orphan rows for slugs the operator never configured. Returns the
+ * effective state after the upsert. Uses raw SQL because the dbShim
+ * mishandles composite ON CONFLICT keys.
+ */
+export async function setBuiltinMcpEnabled(
+    userId: string,
+    slug: string,
+    enabled: boolean,
+): Promise<{ ok: true; enabled: boolean } | { ok: false; error: string }> {
+    let entries: ParsedEntry[];
+    try {
+        entries = await loadConfig();
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { ok: false, error: msg };
+    }
+    // Accept EULEX partner slug even though it's not in mcp.json.
+    const knownSlugs = entries.map((e) => e.slug);
+    if (isEulexPartnerConfigured()) knownSlugs.push(EULEX_SLUG);
+    if (!knownSlugs.includes(slug)) {
+        return { ok: false, error: "Unknown built-in connector slug" };
+    }
+    // Raw SQL on purpose: the in-house dbShim wraps composite onConflict
+    // strings into a single quoted identifier, which Postgres rejects.
+    // The composite PK upsert here is small and self-contained, so a
+    // direct query is the most predictable path.
+    try {
+        await query(
+            `
+            INSERT INTO public.user_mcp_builtin_prefs (user_id, slug, enabled)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (user_id, slug)
+            DO UPDATE SET enabled = EXCLUDED.enabled,
+                          updated_at = now()
+            `,
+            [userId, slug, enabled],
+        );
+        return { ok: true, enabled };
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { ok: false, error: msg };
+    }
 }
