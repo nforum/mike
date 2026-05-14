@@ -55,8 +55,19 @@ function getAuthHeader(): Record<string, string> {
     return { Authorization: `Bearer ${tokens.access_token}` };
 }
 
+/** Sent to the API so LLM prompts match the active Next.js UI locale (en | hr). */
+function getUiLocaleHeader(): Record<string, string> {
+    if (typeof document === "undefined") return {};
+    const m = document.cookie.match(/(?:^|; )NEXT_LOCALE=([^;]*)/);
+    const raw = m?.[1] ? decodeURIComponent(m[1]) : "";
+    const code = raw.trim();
+    if (code === "hr" || code === "en") return { "X-UI-Locale": code };
+    return {};
+}
+
 async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
     const authHeaders = getAuthHeader();
+    const localeHeaders = getUiLocaleHeader();
     const { headers: initHeaders, ...restInit } = init ?? {};
 
     let response = await fetch(`${API_BASE}${path}`, {
@@ -64,6 +75,7 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
         ...restInit,
         headers: {
             Accept: "application/json",
+            ...localeHeaders,
             ...authHeaders,
             ...(initHeaders as Record<string, string> | undefined),
         },
@@ -81,6 +93,7 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
                         ...restInit,
                         headers: {
                             Accept: "application/json",
+                            ...localeHeaders,
                             Authorization: `Bearer ${refreshed.access_token}`,
                             ...(initHeaders as Record<string, string> | undefined),
                         },
@@ -641,6 +654,7 @@ export async function streamChat(payload: {
         headers: {
             "Content-Type": "application/json",
             Accept: "text/event-stream",
+            ...getUiLocaleHeader(),
             ...authHeaders,
         },
         body: JSON.stringify(body),
@@ -673,6 +687,7 @@ export async function streamProjectChat(payload: {
         headers: {
             "Content-Type": "application/json",
             Accept: "text/event-stream",
+            ...getUiLocaleHeader(),
             ...authHeaders,
         },
         body: JSON.stringify(body),
@@ -755,6 +770,25 @@ export async function generateTabularColumnPrompt(
     });
 }
 
+export async function suggestTabularColumnsWithAi(
+    reviewId: string,
+    instruction: string,
+    columns_config: unknown[],
+): Promise<{
+    columns: Array<{
+        name: string;
+        prompt: string;
+        format: string;
+        tags?: string[];
+    }>;
+}> {
+    return apiRequest(`/tabular-review/ai-suggest-columns`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ review_id: reviewId, instruction, columns_config }),
+    });
+}
+
 export async function uploadReviewDocument(
     reviewId: string,
     file: File,
@@ -786,7 +820,7 @@ export async function streamTabularGeneration(
     const authHeaders = getAuthHeader();
     return fetch(`${API_BASE}/tabular-review/${reviewId}/generate`, {
         method: "POST",
-        headers: { ...authHeaders },
+        headers: { ...getUiLocaleHeader(), ...authHeaders },
     });
 }
 
@@ -800,7 +834,11 @@ export async function streamTabularChat(
     const authHeaders = getAuthHeader();
     return fetch(`${API_BASE}/tabular-review/${reviewId}/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
+        headers: {
+            "Content-Type": "application/json",
+            ...getUiLocaleHeader(),
+            ...authHeaders,
+        },
         body: JSON.stringify({
             messages,
             chat_id: chat_id ?? undefined,
@@ -964,6 +1002,22 @@ export async function updateWorkflow(
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+    });
+}
+
+export async function refineWorkflowWithAi(
+    workflowId: string,
+    instruction: string,
+): Promise<{
+    title: string;
+    type: string;
+    prompt_md: string;
+    columns_config: unknown[];
+}> {
+    return apiRequest(`/workflows/ai-refine`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workflow_id: workflowId, instruction }),
     });
 }
 

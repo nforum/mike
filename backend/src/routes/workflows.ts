@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import { createServerSupabase } from "../lib/supabase";
-
-
+import { completeText } from "../lib/llm";
+import { getUserModelSettings } from "../lib/userSettings";
+import { localeContextForLlm, parseUiLocale } from "../lib/uiLocale";
 
 export const workflowsRouter = Router();
 
@@ -165,6 +166,110 @@ workflowsRouter.post("/", requireAuth, async (req, res) => {
     .single();
   if (error) return void res.status(500).json({ detail: error.message });
   res.status(201).json(data);
+});
+
+// POST /workflows/ai-refine — LLM updates a workflow from natural language (UI applies PATCH)
+workflowsRouter.post("/ai-refine", requireAuth, async (req, res) => {
+  const userId = res.locals.userId as string;
+  const userEmail = res.locals.userEmail as string;
+  const { workflow_id, instruction } = req.body as {
+    workflow_id?: string;
+    instruction?: string;
+  };
+  if (!workflow_id?.trim() || !instruction?.trim()) {
+    return void res
+      .status(400)
+      .json({ detail: "workflow_id and instruction are required" });
+  }
+  const db = createServerSupabase();
+  const access = await resolveWorkflowAccess(workflow_id, userId, userEmail, db);
+  if (!access || access.workflow.is_system || !access.allowEdit) {
+    return void res
+      .status(404)
+      .json({ detail: "Workflow not found or not editable" });
+  }
+  const wf = access.workflow;
+  const type = String(wf.type ?? "assistant");
+  const uiLocale = parseUiLocale(req);
+  const { title_model, api_keys } = await getUserModelSettings(userId, db);
+
+  const current = {
+    type,
+    title: wf.title,
+    prompt_md: wf.prompt_md ?? "",
+    columns_config: wf.columns_config ?? [],
+  };
+
+  const languageDirective =
+    uiLocale === "hr"
+      ? "VAŽNO: Sva tekstualna polja koja korisnik vidi (\"title\", \"prompt_md\", te u svakom stupcu \"name\", \"prompt\" i \"tags\") piši ISKLJUČIVO na standardnom hrvatskom jeziku (hrvatska pravna terminologija). Ne koristi engleski, srpski ni bosanski."
+      : "IMPORTANT: Write all user-visible text fields (\"title\", \"prompt_md\", and per-column \"name\", \"prompt\", \"tags\") in clear international English. Do not switch to another language even if the user instruction is in another language.";
+
+  const system = `You improve legal automation workflows in the Max app. Apply the user's instruction to the CURRENT workflow JSON.
+
+Return ONLY a single JSON object (no markdown fences). Include every key: "title", "type", "prompt_md", "columns_config".
+
+Rules:
+- "type" must remain "${type}" unless the user explicitly asks to change the workflow modality.
+- For assistant workflows, set "columns_config" to [].
+- For tabular workflows, "columns_config" is an array ordered by index 0..n-1. Each item: { "index": number, "name": string, "prompt": string, "format": string, "tags"?: string[] }.
+- "format" must be one of: text, bulleted_list, number, percentage, monetary_amount, currency, yes_no, date, tag. Use "tag" only with a non-empty "tags" array of allowed tag strings when the user wants a closed set.
+- "prompt_md" is the assistant instruction markdown; for tabular it can be a brief overview or "".
+
+${localeContextForLlm(uiLocale)}
+
+${languageDirective}`;
+
+  const userMsg = `CURRENT:\n${JSON.stringify(current, null, 2)}\n\nINSTRUCTION:\n${instruction.trim()}\n\n${languageDirective}`;
+
+  try {
+    const raw = await completeText({
+      model: title_model,
+      systemPrompt: system,
+      user: userMsg,
+      maxTokens: 8192,
+      apiKeys: api_keys,
+    });
+    const cleaned = raw
+      .replace(/^```(?:json)?\n?/i, "")
+      .replace(/\n?```$/, "")
+      .trim();
+    const parsed = JSON.parse(cleaned) as {
+      title?: unknown;
+      prompt_md?: unknown;
+      columns_config?: unknown;
+    };
+    if (
+      typeof parsed.title !== "string" ||
+      typeof parsed.prompt_md !== "string" ||
+      !Array.isArray(parsed.columns_config)
+    ) {
+      return void res.status(502).json({ detail: "Invalid AI response shape" });
+    }
+    const columnsOut =
+      type === "assistant"
+        ? []
+        : (parsed.columns_config as Record<string, unknown>[]).map(
+            (c, i) => ({
+              index: typeof c.index === "number" ? c.index : i,
+              name: String(c.name ?? ""),
+              prompt: String(c.prompt ?? ""),
+              format: String(c.format ?? "text"),
+              tags: Array.isArray(c.tags)
+                ? c.tags.filter((x) => typeof x === "string")
+                : undefined,
+            }),
+          );
+    res.json({
+      title: parsed.title,
+      type,
+      prompt_md: parsed.prompt_md,
+      columns_config: columnsOut,
+    });
+  } catch (e) {
+    console.error("[workflows/ai-refine]", e);
+    res.status(502).json({ detail: "AI refinement failed" });
+  }
 });
 
 async function handleWorkflowUpdate(req: import("express").Request, res: import("express").Response) {

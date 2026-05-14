@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, Plus, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { ColumnConfig, ColumnFormat } from "../shared/types";
 import { generateTabularColumnPrompt } from "@/app/lib/mikeApi";
-import { FORMAT_OPTIONS, formatLabel, formatIcon } from "../tabular/columnFormat";
+import { FORMAT_OPTIONS, formatLabelT, formatIcon } from "../tabular/columnFormat";
 import { TAG_COLORS } from "../tabular/pillUtils";
 import { getPresetConfig, PROMPT_PRESETS } from "../tabular/columnPresets";
 import {
@@ -32,6 +33,7 @@ interface Props {
 }
 
 export function WFEditColumnModal({ column, onClose, onSave, onDelete }: Props) {
+    const tFmt = useTranslations("columnFormats");
     const [draft, setDraft] = useState<ColumnDraft>({
         name: column.name,
         prompt: column.prompt,
@@ -203,7 +205,7 @@ export function WFEditColumnModal({ column, onClose, onSave, onDelete }: Props) 
                                     <button className="mt-1 flex items-center justify-between rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-700 hover:border-gray-400 focus:outline-none">
                                         <span className="flex items-center gap-2">
                                             <FormatIcon className="h-3.5 w-3.5 text-gray-400" />
-                                            {formatLabel(draft.format)}
+                                            {formatLabelT(draft.format, tFmt)}
                                         </span>
                                         <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
                                     </button>
@@ -216,7 +218,7 @@ export function WFEditColumnModal({ column, onClose, onSave, onDelete }: Props) 
                                         {FORMAT_OPTIONS.map((o) => (
                                             <DropdownMenuRadioItem key={o.value} value={o.value}>
                                                 <o.icon className="h-3.5 w-3.5 text-gray-400" />
-                                                {o.label}
+                                                {tFmt(o.labelKey)}
                                             </DropdownMenuRadioItem>
                                         ))}
                                     </DropdownMenuRadioGroup>

@@ -50,26 +50,25 @@ export function resolveDefaultMainModel(apiKeys?: UserApiKeys): string {
     return DEFAULT_MAIN_MODEL;
 }
 
-// Title generation is a lightweight task — always routed to the cheapest model
-// of whichever provider the user has keys for: LocalLLM lite if available, 
-// otherwise Gemini Flash Lite, otherwise Claude Haiku.
+// Title generation is a lightweight task — routed to the default title model
+// (Claude Sonnet) which prod always has wired via Secret Manager, then falls
+// back through cheaper per-provider models.
 function resolveTitleModel(apiKeys: UserApiKeys): string {
-    // Check if LocalLLM is configured server-side
-    if (process.env.VLLM_BASE_URL?.trim()) {
-        return "localllm-lite";
-    }
-    // User-level keys take priority
-    if (apiKeys.gemini?.trim()) return DEFAULT_TITLE_MODEL;
-    if (apiKeys.claude?.trim()) return "claude-haiku-4-5";
+    // Claude first — prod always has ANTHROPIC_API_KEY
+    if (apiKeys.claude?.trim()) return DEFAULT_TITLE_MODEL;
+    // LocalLLM for self-hosters
+    if (process.env.VLLM_BASE_URL?.trim()) return "localllm-lite";
+    // Other providers — cheapest tier each
+    if (apiKeys.gemini?.trim()) return "gemini-3.1-flash-lite-preview";
     if (apiKeys.openai?.trim()) return "gpt-5.4-nano";
     if (apiKeys.mistral?.trim()) return "mistral-small-latest";
     // Fall back to server-level env keys
-    if (process.env.GEMINI_API_KEY?.trim()) return DEFAULT_TITLE_MODEL;
     if (
         process.env.ANTHROPIC_API_KEY?.trim() ||
         process.env.CLAUDE_API_KEY?.trim()
     )
-        return "claude-haiku-4-5";
+        return DEFAULT_TITLE_MODEL;
+    if (process.env.GEMINI_API_KEY?.trim()) return "gemini-3.1-flash-lite-preview";
     if (process.env.OPENAI_API_KEY?.trim()) return "gpt-5.4-nano";
     if (process.env.MISTRAL_API_KEY?.trim()) return "mistral-small-latest";
     return DEFAULT_TITLE_MODEL;

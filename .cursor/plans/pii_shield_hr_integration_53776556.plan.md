@@ -9,7 +9,7 @@ todos:
     content: "HR recognizeri: OIB (ručni mod-11,10 + test corpus 30+30), HR IBAN (mod-97), MBS (context-driven), sudski_broj, zk, hr_address fallback. Test corpus: false_positive, false_negative, roundtrip s disclosure override testovima. Presidio NER + regex + checksum + context word analysis — sve 4 razine."
     status: pending
   - id: opf-adapter-stub
-    content: "opf_engine.py stub (NotImplementedError) iza PII_ENGINE=presidio|opf|both feature flaga."
+    content: opf_engine.py stub (NotImplementedError) iza PII_ENGINE=presidio|opf|both feature flaga.
     status: pending
   - id: db-migration
     content: "Migracija 110_pii_anonymization.sql: pii_sessions (status, entity_summary, encrypted_dek active od starta), pii_mappings (+ RLS policy: pii_shield_app only), pii_audit_log (ip_hash, ua_hash), ALTER document_versions (pii_session_id, pii_processed_text_cache, pii_status), ALTER user_profiles. Role separation + RLS."
@@ -27,10 +27,10 @@ todos:
     content: "DocumentAnonymizationPreviewModal.tsx (v1 simple): read-only preview + lista entiteta s checkboxima. original_preview lazy on-hover (Strict: samo tip+duljinu). Footer: Cancel / Apply & send / Send original (AYS). GDPR info banner: 'This is pseudonymization, not anonymization.' BEZ TipTap u v1."
     status: pending
   - id: frontend-account-page
-    content: "account/privacy/page.tsx + tab + i18n keys. GDPR disclaimer u UI. Audit log s approve_disclosure. BEZ 'guarantee' ili 'anonymization' u marketinškoj kopiji — koristi 'pseudonymization'."
+    content: account/privacy/page.tsx + tab + i18n keys. GDPR disclaimer u UI. Audit log s approve_disclosure. BEZ 'guarantee' ili 'anonymization' u marketinškoj kopiji — koristi 'pseudonymization'.
     status: pending
   - id: frontend-chat-integration
-    content: "AddDocButton intercept (pii_default_mode != off), shield badge na chip-u. AssistantMessage poziva POST /pii/messages/:id/render (inline restore, no title attr, memory-only cache, clear na logout/idle)."
+    content: AddDocButton intercept (pii_default_mode != off), shield badge na chip-u. AssistantMessage poziva POST /pii/messages/:id/render (inline restore, no title attr, memory-only cache, clear na logout/idle).
     status: pending
   - id: word-addin
     content: "Word add-in: isti simple modal (read-only preview, checkboxes, bez TipTap). Ephemeral sesija za selection."

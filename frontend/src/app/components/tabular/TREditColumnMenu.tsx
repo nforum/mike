@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { ChevronDown, Loader2, MoreHorizontal, Plus, Trash2, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { ColumnConfig, ColumnFormat } from "../shared/types";
 import { generateTabularColumnPrompt } from "@/app/lib/mikeApi";
-import { FORMAT_OPTIONS, formatLabel, formatIcon } from "./columnFormat";
+import { FORMAT_OPTIONS, formatLabelT, formatIcon } from "./columnFormat";
 import { TAG_COLORS } from "./pillUtils";
 import {
     DropdownMenu,
@@ -27,6 +28,8 @@ export function TREditColumnMenu({
     onSave,
     onDelete,
 }: TREditColumnMenuProps) {
+    const t = useTranslations("addColumn");
+    const tFmt = useTranslations("columnFormats");
     const [open, setOpen] = useState(false);
     const [name, setName] = useState(column.name);
     const [prompt, setPrompt] = useState(column.prompt);
@@ -171,7 +174,7 @@ export function TREditColumnMenu({
                                                 <Icon className="h-3 w-3 text-gray-400" />
                                             );
                                         })()}
-                                        {formatLabel(format)}
+                                        {formatLabelT(format, tFmt)}
                                     </span>
                                     <ChevronDown className="h-3 w-3 text-gray-400" />
                                 </button>
@@ -197,7 +200,7 @@ export function TREditColumnMenu({
                                             className="text-xs"
                                         >
                                             <o.icon className="h-3 w-3 text-gray-400" />
-                                            {o.label}
+                                            {tFmt(o.labelKey)}
                                         </DropdownMenuRadioItem>
                                     ))}
                                 </DropdownMenuRadioGroup>

@@ -18,6 +18,11 @@ import {
     filterAccessibleDocumentIds,
     listAccessibleProjectIds,
 } from "../lib/access";
+import {
+    localeContextForLlm,
+    parseUiLocale,
+    type UiLocale,
+} from "../lib/uiLocale";
 
 function formatPromptSuffix(format?: string, tags?: string[]): string {
     switch (format) {
@@ -236,6 +241,7 @@ tabularRouter.post("/", requireAuth, async (req, res) => {
 
 // POST /tabular-review/prompt (must come before /:reviewId routes)
 tabularRouter.post("/prompt", requireAuth, async (req, res) => {
+    const uiLocale = parseUiLocale(req);
     const userId = res.locals.userId as string;
     const title =
         typeof req.body.title === "string" ? req.body.title.trim() : "";
@@ -270,6 +276,11 @@ tabularRouter.post("/prompt", requireAuth, async (req, res) => {
             : "";
     const docNote = documentName ? `\nDocument type/name: ${documentName}` : "";
 
+    const languageDirective =
+        uiLocale === "hr"
+            ? "VAŽNO: Sav tekst polja \"prompt\" piši ISKLJUČIVO na standardnom hrvatskom jeziku (hrvatska pravna terminologija). Ne piši na engleskom, srpskom ni bosanskom."
+            : "IMPORTANT: Write the entire \"prompt\" field in clear international English. Do not switch to another language even if the column title is in another language.";
+
     const userMessage =
         `Column title: ${title}` +
         docNote +
@@ -277,14 +288,18 @@ tabularRouter.post("/prompt", requireAuth, async (req, res) => {
         tagsNote +
         `\n\nWrite the best extraction prompt for a legal tabular review column with this title. ` +
         `Do NOT include any instruction about the response format in the prompt — ` +
-        `format handling is applied separately and must not be duplicated inside the prompt text.`;
+        `format handling is applied separately and must not be duplicated inside the prompt text.\n\n` +
+        languageDirective;
 
     try {
         const { title_model, api_keys } = await getUserModelSettings(userId);
         const raw = await completeText({
             model: title_model,
             systemPrompt:
-                'You write high-quality column prompts for legal tabular review workflows. Return only valid JSON with a single field: {"prompt": string}. The prompt you write must focus solely on what to extract — never on how to format the response.',
+                'You write high-quality column prompts for legal tabular review workflows. Return only valid JSON with a single field: {"prompt": string}. The prompt you write must focus solely on what to extract — never on how to format the response. The "prompt" string must always match the user\'s UI language as specified in the locale context below.\n\n' +
+                localeContextForLlm(uiLocale) +
+                "\n\n" +
+                languageDirective,
             user: userMessage,
             maxTokens: 512,
             apiKeys: api_keys,
@@ -302,6 +317,84 @@ tabularRouter.post("/prompt", requireAuth, async (req, res) => {
         }
     } catch {
         res.status(502).json({ detail: "Failed to generate prompt from LLM" });
+    }
+});
+
+// POST /tabular-review/ai-suggest-columns — suggest additional columns (client merges into review)
+tabularRouter.post("/ai-suggest-columns", requireAuth, async (req, res) => {
+    const userId = res.locals.userId as string;
+    const userEmail = res.locals.userEmail as string | undefined;
+    const { review_id, instruction, columns_config } = req.body as {
+        review_id?: string;
+        instruction?: string;
+        columns_config?: unknown;
+    };
+    if (!review_id?.trim() || !instruction?.trim()) {
+        return void res
+            .status(400)
+            .json({ detail: "review_id and instruction are required" });
+    }
+    if (!Array.isArray(columns_config)) {
+        return void res
+            .status(400)
+            .json({ detail: "columns_config must be an array" });
+    }
+
+    const db = createServerSupabase();
+    const { data: review, error } = await db
+        .from("tabular_reviews")
+        .select("id, user_id, project_id, columns_config")
+        .eq("id", review_id)
+        .single();
+    if (error || !review)
+        return void res.status(404).json({ detail: "Review not found" });
+    const access = await ensureReviewAccess(review, userId, userEmail, db);
+    if (!access.ok)
+        return void res.status(404).json({ detail: "Review not found" });
+
+    const uiLocale = parseUiLocale(req);
+    const { title_model, api_keys } = await getUserModelSettings(userId, db);
+
+    const languageDirective =
+        uiLocale === "hr"
+            ? "VAŽNO: Sva polja \"name\", \"prompt\" i \"tags\" piši ISKLJUČIVO na standardnom hrvatskom jeziku (hrvatska pravna terminologija). Ne koristi engleski, srpski ni bosanski."
+            : "IMPORTANT: Write all \"name\", \"prompt\" and \"tags\" values in clear international English. Do not switch to another language even if the user instruction is in another language.";
+
+    const system = `You design extraction columns for legal tabular review in Max. The user wants NEW columns to add.
+
+Return ONLY valid JSON: {"columns":[{ "name": string, "prompt": string, "format": string, "tags"?: string[] }]}
+
+"format" must be one of: text, bulleted_list, number, percentage, monetary_amount, currency, yes_no, date, tag.
+For format "tag", include "tags" as a non-empty array of allowed tag strings.
+
+Do not duplicate existing columns unless the user explicitly asks to replace — typically suggest net-new columns only.
+
+${localeContextForLlm(uiLocale)}
+
+${languageDirective}`;
+
+    const userMsg = `EXISTING columns_config:\n${JSON.stringify(columns_config)}\n\nUSER INSTRUCTION:\n${instruction.trim()}`;
+
+    try {
+        const raw = await completeText({
+            model: title_model,
+            systemPrompt: system,
+            user: `${userMsg}\n\n${languageDirective}`,
+            maxTokens: 4096,
+            apiKeys: api_keys,
+        });
+        const cleaned = raw
+            .replace(/^```(?:json)?\n?/i, "")
+            .replace(/\n?```$/, "")
+            .trim();
+        const parsed = JSON.parse(cleaned) as { columns?: unknown };
+        if (!Array.isArray(parsed.columns)) {
+            return void res.status(502).json({ detail: "Invalid AI response" });
+        }
+        res.json({ columns: parsed.columns });
+    } catch (e) {
+        console.error("[tabular/ai-suggest-columns]", e);
+        res.status(502).json({ detail: "AI column suggestion failed" });
     }
 });
 
@@ -734,6 +827,7 @@ tabularRouter.post(
             userId,
             db,
         );
+        const uiLocale = parseUiLocale(req);
         const result = await queryGemini(
             tabular_model,
             doc.filename as string,
@@ -742,6 +836,7 @@ tabularRouter.post(
             column.format,
             column.tags,
             api_keys,
+            uiLocale,
         );
 
         if (!result) {
@@ -767,6 +862,7 @@ tabularRouter.post(
 
 // POST /tabular-review/:reviewId/generate
 tabularRouter.post("/:reviewId/generate", requireAuth, async (req, res) => {
+    const uiLocale = parseUiLocale(req);
     const userId = res.locals.userId as string;
     const userEmail = res.locals.userEmail as string | undefined;
     const { reviewId } = req.params;
@@ -914,6 +1010,7 @@ tabularRouter.post("/:reviewId/generate", requireAuth, async (req, res) => {
                             );
                         },
                         api_keys,
+                        uiLocale,
                     );
                 } catch (err) {
                     console.error(
@@ -1092,6 +1189,7 @@ function buildTabularMessages(
     messages: ChatMessage[],
     tabularStore: TabularCellStore,
     reviewTitle: string,
+    uiLocale: UiLocale,
 ): unknown[] {
     const docList = tabularStore.documents
         .map((d, i) => `- ROW:${i} "${d.filename}"`)
@@ -1129,7 +1227,9 @@ Rules:
 - quote should be verbatim text from the cell's summary
 - Omit <CITATIONS> if you make no citations
 - Do not fabricate cell content
-- Answer in clear, concise prose. You may use markdown formatting.`;
+- Answer in clear, concise prose. You may use markdown formatting.
+
+${localeContextForLlm(uiLocale)}`;
 
     const formatted: unknown[] = [{ role: "system", content: systemContent }];
     for (const msg of messages) {
@@ -1144,6 +1244,7 @@ Rules:
 
 // POST /tabular-review/:reviewId/chat
 tabularRouter.post("/:reviewId/chat", requireAuth, async (req, res) => {
+    const uiLocale = parseUiLocale(req);
     const userId = res.locals.userId as string;
     const userEmail = res.locals.userEmail as string | undefined;
     const { reviewId } = req.params;
@@ -1267,6 +1368,7 @@ tabularRouter.post("/:reviewId/chat", requireAuth, async (req, res) => {
         messages,
         tabularStore,
         review.title || "Untitled Review",
+        uiLocale,
     );
 
     res.setHeader("Content-Type", "text/event-stream");
@@ -1314,15 +1416,14 @@ tabularRouter.post("/:reviewId/chat", requireAuth, async (req, res) => {
 
         // Generate title on first exchange
         if (chatId && isFirstExchange && !chatTitle && lastUser.content) {
-            const { title_model, preferred_language } =
-                await getUserModelSettings(userId, db);
+            const { title_model } = await getUserModelSettings(userId, db);
             const title = await generateChatTitle(
                 title_model,
                 lastUser.content,
                 {
                     reviewTitle: clientReviewTitle ?? review.title ?? null,
                     projectName: clientProjectName ?? null,
-                    language: preferred_language,
+                    language: uiLocale,
                 },
                 apiKeys,
             );
@@ -1403,6 +1504,7 @@ async function queryGemini(
     format?: string,
     tags?: string[],
     apiKeys?: import("../lib/llm").UserApiKeys,
+    uiLocale: UiLocale = "en",
 ) {
     const suffix = formatPromptSuffix(format as never, tags);
     const fullPrompt = `${columnPrompt}${suffix} If not found, state "Not Found". Leave all reasoning and explanation in the "reasoning" field only.`;
@@ -1412,7 +1514,9 @@ async function queryGemini(
 
 The "summary" and "reasoning" field values may use markdown formatting (bullets, bold, italics, etc.) — the values are still plain JSON strings (escape newlines as \\n), but the text inside will be rendered as markdown in the UI.
 
-The "summary" field must contain only the extracted value with inline citations — no explanation or reasoning. Every factual claim in "summary" must be followed immediately by a citation in the format [[page:N||quote:exact quoted text]], where N is the page number and the quote is a short verbatim excerpt (≤ 25 words). The quote must be narrowly scoped to the specific claim it supports — extract only the exact words that support that statement, not the surrounding sentence or paragraph. Do not have multiple claims share the same long quote; if two different statements need different evidence, give each its own short, narrowly-scoped quote. All reasoning and explanation belongs in "reasoning" only, which may also contain citations.`;
+The "summary" field must contain only the extracted value with inline citations — no explanation or reasoning. Every factual claim in "summary" must be followed immediately by a citation in the format [[page:N||quote:exact quoted text]], where N is the page number and the quote is a short verbatim excerpt (≤ 25 words). The quote must be narrowly scoped to the specific claim it supports — extract only the exact words that support that statement, not the surrounding sentence or paragraph. Do not have multiple claims share the same long quote; if two different statements need different evidence, give each its own short, narrowly-scoped quote. All reasoning and explanation belongs in "reasoning" only, which may also contain citations.
+
+${localeContextForLlm(uiLocale)}`;
 
     let raw: string;
     try {
@@ -1567,6 +1671,7 @@ async function queryGeminiAllColumns(
     columns: Column[],
     onResult: (columnIndex: number, result: CellResult) => Promise<void>,
     apiKeys?: import("../lib/llm").UserApiKeys,
+    uiLocale: UiLocale = "en",
 ): Promise<void> {
     const columnsDesc = columns
         .map((col) => {
@@ -1625,7 +1730,7 @@ Rules:
     try {
         await streamChatWithTools({
             model,
-            systemPrompt: SYSTEM,
+            systemPrompt: SYSTEM + "\n\n" + localeContextForLlm(uiLocale),
             messages: [{ role: "user", content: USER }],
             tools: [],
             apiKeys,

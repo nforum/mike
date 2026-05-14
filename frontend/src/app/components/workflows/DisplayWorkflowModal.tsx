@@ -15,7 +15,7 @@ import remarkGfm from "remark-gfm";
 import type { MikeDocument, MikeWorkflow } from "../shared/types";
 import { createTabularReview } from "@/app/lib/mikeApi";
 import { useRouter } from "next/navigation";
-import { formatIcon, formatLabel } from "../tabular/columnFormat";
+import { formatIcon, formatLabelT } from "../tabular/columnFormat";
 import { useDirectoryData } from "../shared/useDirectoryData";
 import { FileDirectory } from "../shared/FileDirectory";
 import type { MikeProject } from "../shared/types";
@@ -198,6 +198,7 @@ function AssistantPanel({ workflow, workflowPromptLabel = "Workflow Prompt", noP
 // Right panel for tabular workflows — accordion column list (select screen)
 // ---------------------------------------------------------------------------
 function TabularPanel({ workflow, columnsLabel = "Columns", noColumnsLabel = "No columns defined", tagsLabel = "Tags", promptLabel = "Prompt", noPromptLabel = "_No prompt defined._" }: { workflow: MikeWorkflow; columnsLabel?: string; noColumnsLabel?: string; tagsLabel?: string; promptLabel?: string; noPromptLabel?: string }) {
+    const tFmt = useTranslations("columnFormats");
     const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
     const columns = (workflow.columns_config ?? []).sort(
         (a, b) => a.index - b.index,
@@ -236,7 +237,7 @@ function TabularPanel({ workflow, columnsLabel = "Columns", noColumnsLabel = "No
                                         {col.name}
                                     </span>
                                     <span className="shrink-0 text-gray-400">
-                                        {formatLabel(col.format ?? "text")}
+                                        {formatLabelT(col.format ?? "text", tFmt)}
                                     </span>
                                     <ChevronDown
                                         className={`h-3 w-3 shrink-0 text-gray-300 transition-transform duration-150 ${isExpanded ? "rotate-180" : ""}`}

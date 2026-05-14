@@ -6,7 +6,7 @@ import { ChevronDown, Plus, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { ColumnConfig, ColumnFormat } from "../shared/types";
 import { generateTabularColumnPrompt } from "@/app/lib/mikeApi";
-import { FORMAT_OPTIONS, formatLabel, formatIcon } from "./columnFormat";
+import { FORMAT_OPTIONS, formatLabelT, formatIcon } from "./columnFormat";
 import { TAG_COLORS } from "./pillUtils";
 import { getPresetConfig, PROMPT_PRESETS } from "./columnPresets";
 import {
@@ -45,6 +45,7 @@ interface Props {
 
 export function AddColumnModal({ open, existingCount, onClose, onAdd, editingColumn, onSave, onDelete }: Props) {
     const t = useTranslations("addColumn");
+    const tFmt = useTranslations("columnFormats");
     const isEditing = !!editingColumn;
     const [columns, setColumns] = useState<ColumnDraft[]>([{ ...EMPTY_DRAFT }]);
     const [generatingIndices, setGeneratingIndices] = useState<number[]>([]);
@@ -345,7 +346,7 @@ export function AddColumnModal({ open, existingCount, onClose, onAdd, editingCol
                                                             <Icon className="h-3.5 w-3.5 text-gray-400" />
                                                         );
                                                     })()}
-                                                    {formatLabel(column.format)}
+                                                    {formatLabelT(column.format, tFmt)}
                                                 </span>
                                                 <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
                                             </button>
@@ -370,7 +371,7 @@ export function AddColumnModal({ open, existingCount, onClose, onAdd, editingCol
                                                         value={o.value}
                                                     >
                                                         <o.icon className="h-3.5 w-3.5 text-gray-400" />
-                                                        {o.label}
+                                                        {tFmt(o.labelKey)}
                                                     </DropdownMenuRadioItem>
                                                 ))}
                                             </DropdownMenuRadioGroup>

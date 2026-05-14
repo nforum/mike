@@ -13,6 +13,7 @@ import {
 import { completeText } from "../lib/llm";
 import { recordLlmUsage } from "../lib/llmUsage";
 import { getUserApiKeys, getUserModelSettings } from "../lib/userSettings";
+import { localeContextForLlm, parseUiLocale } from "../lib/uiLocale";
 import { checkProjectAccess } from "../lib/access";
 import {
     closeMcpServers,
@@ -586,7 +587,12 @@ chatRouter.post("/", requireAuth, async (req, res) => {
         db,
         docIndex,
     );
-    const apiMessages = buildMessages(enrichedMessages, docAvailability);
+    const apiMessages = buildMessages(
+        enrichedMessages,
+        docAvailability,
+        localeContextForLlm(parseUiLocale(req)),
+        docIndex,
+    );
 
     const workflowStore = await buildWorkflowStore(userId, userEmail, db);
 

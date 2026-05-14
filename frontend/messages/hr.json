@@ -19,6 +19,30 @@
     "copy": "Kopiraj",
     "copied": "Kopirano"
   },
+  "columnFormats": {
+    "freeText": "Slobodan tekst",
+    "bulletedList": "Popis s nabrajanjem",
+    "number": "Broj",
+    "percentage": "Postotak",
+    "monetaryAmount": "Novčani iznos",
+    "currency": "Valuta",
+    "yesNo": "Da / Ne",
+    "date": "Datum",
+    "tags": "Oznake"
+  },
+  "floatingAi": {
+    "workflowTitle": "Prilagodi radni tijek pomoću AI",
+    "workflowPlaceholder": "Opišite što dodati ili promijeniti — stupce, upite ili upute radnog tijeka…",
+    "workflowSubmit": "Primijeni",
+    "workflowRunning": "Primjena…",
+    "tabularTitle": "Dodaj stupce pomoću AI",
+    "tabularPlaceholder": "Opišite koje stupce izdvojiti iz svakog dokumenta…",
+    "tabularSubmit": "Generiraj",
+    "tabularRunning": "Generiranje…",
+    "error": "Nešto je pošlo po krivu. Pokušajte ponovno.",
+    "expand": "Prikaži",
+    "collapse": "Sakrij"
+  },
   "messageActions": {
     "print": "Ispiši",
     "exportPdf": "Izvezi u PDF",
@@ -550,6 +574,7 @@
     "untitledChat": "Razgovor bez naslova",
     "untitledReview": "Pregled bez naslova",
     "assistant": "Asistent",
+    "projectAssistantHeading": "Asistent predmeta",
     "tabularReviews": "Tablični pregledi",
     "tabularReview": "Tablični pregled",
     "projects": "Predmeti",
@@ -587,7 +612,26 @@
     "addDocuments": "Dodaj dokumente",
     "addColumns": "Dodaj stupce",
     "people": "Osobe",
-    "projects": "Predmeti"
+    "projects": "Predmeti",
+    "chatAssistantTitle": "Asistent",
+    "chatAskAboutReview": "Postavite pitanje o ovom tabličnom pregledu.",
+    "chatInputPlaceholder": "Postavite pitanje o svojim dokumentima...",
+    "chatHistoryTitle": "Povijest razgovora",
+    "chatNewTitle": "Novi razgovor",
+    "chatDeleteTitle": "Obriši razgovor",
+    "chatSearchPlaceholder": "Pretraži razgovore…",
+    "chatNoPrevious": "Nema prethodnih razgovora.",
+    "chatNoMatches": "Nema rezultata.",
+    "chatDefaultTitle": "Razgovor",
+    "chatErrorRetry": "Dogodila se pogreška. Pokušajte ponovno.",
+    "seeDetails": "Vidi detalje",
+    "panelFlag": "Oznaka",
+    "panelResults": "Rezultati",
+    "panelReasoning": "Obrazloženje",
+    "flagDisplayGreen": "Zelena",
+    "flagDisplayGrey": "Siva",
+    "flagDisplayYellow": "Žuta",
+    "flagDisplayRed": "Crvena"
   },
   "tabularReviewsPage": {
     "title": "Tablični pregledi",
@@ -665,6 +709,22 @@
         "badColumns": "Polje 'columns_config' mora biti niz.",
         "generic": "Prijenos radnog tijeka nije uspio."
       }
+    },
+    "detail": {
+      "notFound": "Radni tijek nije pronađen.",
+      "readOnly": "Samo za čitanje",
+      "saving": "Spremanje…",
+      "saved": "Spremljeno",
+      "peopleAria": "Osobe",
+      "addColumn": "Dodaj stupac",
+      "actions": "Radnje",
+      "delete": "Obriši",
+      "columnTitle": "Naziv stupca",
+      "format": "Format",
+      "prompt": "Prompt",
+      "columnsEmptyTitle": "Stupci",
+      "columnsEmptyHint": "Dodajte stupce da definirate što ovaj tablični radni tijek izdvaja iz svakog dokumenta.",
+      "addColumnCta": "+ Dodaj stupac"
     }
   },
   "streaming": {

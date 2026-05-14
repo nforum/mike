@@ -7,6 +7,7 @@ import { AlertCircle, Expand } from "lucide-react";
 import type { ColumnConfig, TabularCell as TCell } from "../shared/types";
 import { preprocessCitations, type ParsedCitation } from "./citation-utils";
 import { getPillClass } from "./pillUtils";
+import { useTranslations } from "next-intl";
 
 interface Props {
     cell: TCell;
@@ -152,6 +153,7 @@ export function TabularCell({
     onExpand,
     onCitationClick,
 }: Props) {
+    const t = useTranslations("tabularReview");
     const [inlineExpanded, setInlineExpanded] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -258,7 +260,7 @@ export function TabularCell({
                             className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 transition-colors"
                         >
                             <Expand className="h-3 w-3" />
-                            See details
+                            {t("seeDetails")}
                         </button>
                     </div>
                 </div>

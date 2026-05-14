@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import {
     Check,
     ChevronDown,
@@ -53,6 +54,7 @@ export function FileDirectory({
     heading = "Documents",
     onDelete,
 }: FileDirectoryProps) {
+    const tSidebar = useTranslations("sidebar");
     const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
         new Set(),
     );
@@ -228,7 +230,7 @@ export function FileDirectory({
                 {standaloneDocs.length > 0 && directoryProjects.length > 0 && (
                     <div className="border-t border-gray-100 py-2 px-2">
                         <p className="text-xs font-medium text-gray-400">
-                            Projects
+                            {tSidebar("projects")}
                         </p>
                     </div>
                 )}

@@ -13,6 +13,7 @@ import {
     X,
 } from "lucide-react";
 import type { ColumnConfig, MikeDocument, TabularCell } from "../shared/types";
+import { useTranslations } from "next-intl";
 import { preprocessCitations, type ParsedCitation } from "./citation-utils";
 import { getPillClass } from "./pillUtils";
 import { DocView } from "../shared/DocView";
@@ -67,6 +68,7 @@ export function TRSidePanel({
     citationQuote,
     citationPage,
 }: Props) {
+    const t = useTranslations("tabularReview");
     const sortedColumns = [...columns].sort((a, b) => a.index - b.index);
     const currentPos = sortedColumns.findIndex((c) => c.index === column.index);
     const prevColumn = currentPos > 0 ? sortedColumns[currentPos - 1] : null;
@@ -108,6 +110,22 @@ export function TRSidePanel({
         preprocessCitations(cell.content?.summary ?? "");
     const { processed: reasoningText, citations: reasoningCitations } =
         preprocessCitations(cell.content?.reasoning ?? "");
+
+    function flagDisplayName(flag: string): string {
+        switch (flag.toLowerCase()) {
+            case "green":
+                return t("flagDisplayGreen");
+            case "grey":
+            case "gray":
+                return t("flagDisplayGrey");
+            case "yellow":
+                return t("flagDisplayYellow");
+            case "red":
+                return t("flagDisplayRed");
+            default:
+                return flag;
+        }
+    }
 
     useEffect(() => {
         console.log("[TRSidePanel] summary:", cell.content?.summary ?? "");
@@ -261,13 +279,12 @@ export function TRSidePanel({
                         {cell.content?.flag && (
                             <div className="mb-5">
                                 <h4 className="mb-2 text-sm font-semibold tracking-wider font-sans">
-                                    Flag
+                                    {t("panelFlag")}
                                 </h4>
                                 <span
                                     className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${FLAG_BADGE[cell.content.flag] ?? FLAG_BADGE.grey}`}
                                 >
-                                    {cell.content.flag.charAt(0).toUpperCase() +
-                                        cell.content.flag.slice(1)}
+                                    {flagDisplayName(cell.content.flag)}
                                 </span>
                             </div>
                         )}
@@ -275,7 +292,7 @@ export function TRSidePanel({
                         {/* Results */}
                         <div className="mb-6">
                             <h4 className="mb-2 text-sm font-semibold tracking-wider font-sans">
-                                Results
+                                {t("panelResults")}
                             </h4>
                             <div className="text-xs leading-relaxed text-slate-600">
                                 <MarkdownContent
@@ -292,7 +309,7 @@ export function TRSidePanel({
                         {cell.content?.reasoning && (
                             <div>
                                 <h4 className="mb-2 text-sm font-semibold tracking-wider font-sans">
-                                    Reasoning
+                                    {t("panelReasoning")}
                                 </h4>
                                 <div className="text-xs leading-relaxed text-slate-600">
                                     <MarkdownContent

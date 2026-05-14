@@ -206,6 +206,7 @@ export default function ProjectAssistantChatPage({ params }: Props) {
     const { user } = useAuth();
     const { profile } = useUserProfile();
     const tDelete = useTranslations("confirmDelete");
+    const tProject = useTranslations("projectPage");
     const { confirm: confirmDialog, dialog: confirmDialogEl } =
         useConfirmDialog();
     const username =
@@ -775,7 +776,7 @@ export default function ProjectAssistantChatPage({ params }: Props) {
                         onClick={() => router.push("/projects")}
                         className="text-gray-500 hover:text-gray-700 transition-colors"
                     >
-                        Projects
+                        {tProject("projects")}
                     </button>
                     <span className="text-gray-300">›</span>
                     {project ? (
@@ -802,7 +803,7 @@ export default function ProjectAssistantChatPage({ params }: Props) {
                         }
                         className="text-gray-500 hover:text-gray-700 transition-colors"
                     >
-                        Assistant
+                        {tProject("assistant")}
                     </button>
                     <span className="text-gray-300">›</span>
                     {chatLoaded ? (
@@ -1142,7 +1143,7 @@ export default function ProjectAssistantChatPage({ params }: Props) {
                     <div className="h-10 flex items-center gap-2 px-4 border-b border-gray-200 shrink-0">
                         <MikeIcon size={16} />
                         <span className="text-xs text-gray-700">
-                            Project Assistant
+                            {tProject("projectAssistantHeading")}
                         </span>
                     </div>
 

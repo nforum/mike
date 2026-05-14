@@ -19,6 +19,30 @@
     "copy": "Copy",
     "copied": "Copied"
   },
+  "columnFormats": {
+    "freeText": "Free text",
+    "bulletedList": "Bulleted list",
+    "number": "Number",
+    "percentage": "Percentage",
+    "monetaryAmount": "Monetary amount",
+    "currency": "Currency",
+    "yesNo": "Yes / No",
+    "date": "Date",
+    "tags": "Tags"
+  },
+  "floatingAi": {
+    "workflowTitle": "Refine workflow with AI",
+    "workflowPlaceholder": "Describe what to add or change — columns, prompts, or the workflow instructions…",
+    "workflowSubmit": "Apply",
+    "workflowRunning": "Applying…",
+    "tabularTitle": "Add columns with AI",
+    "tabularPlaceholder": "Describe which columns to extract from each document…",
+    "tabularSubmit": "Generate",
+    "tabularRunning": "Generating…",
+    "error": "Something went wrong. Try again.",
+    "expand": "Show",
+    "collapse": "Hide"
+  },
   "messageActions": {
     "print": "Print",
     "exportPdf": "Export to PDF",
@@ -550,6 +574,7 @@
     "untitledChat": "Untitled Chat",
     "untitledReview": "Untitled Review",
     "assistant": "Assistant",
+    "projectAssistantHeading": "Project Assistant",
     "tabularReviews": "Tabular Reviews",
     "tabularReview": "Tabular Review",
     "projects": "Projects",
@@ -587,7 +612,26 @@
     "addDocuments": "Add Documents",
     "addColumns": "Add Columns",
     "people": "People",
-    "projects": "Projects"
+    "projects": "Projects",
+    "chatAssistantTitle": "Assistant",
+    "chatAskAboutReview": "Ask a question about this tabular review.",
+    "chatInputPlaceholder": "Ask a question about your documents...",
+    "chatHistoryTitle": "Chat history",
+    "chatNewTitle": "New chat",
+    "chatDeleteTitle": "Delete chat",
+    "chatSearchPlaceholder": "Search chats…",
+    "chatNoPrevious": "No previous chats.",
+    "chatNoMatches": "No matches.",
+    "chatDefaultTitle": "Chat",
+    "chatErrorRetry": "An error occurred. Please try again.",
+    "seeDetails": "See details",
+    "panelFlag": "Flag",
+    "panelResults": "Results",
+    "panelReasoning": "Reasoning",
+    "flagDisplayGreen": "Green",
+    "flagDisplayGrey": "Grey",
+    "flagDisplayYellow": "Yellow",
+    "flagDisplayRed": "Red"
   },
   "tabularReviewsPage": {
     "title": "Tabular Reviews",
@@ -665,6 +709,22 @@
         "badColumns": "columns_config must be an array.",
         "generic": "Failed to upload workflow."
       }
+    },
+    "detail": {
+      "notFound": "Workflow not found.",
+      "readOnly": "Read-only",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "peopleAria": "People",
+      "addColumn": "Add Column",
+      "actions": "Actions",
+      "delete": "Delete",
+      "columnTitle": "Column Title",
+      "format": "Format",
+      "prompt": "Prompt",
+      "columnsEmptyTitle": "Columns",
+      "columnsEmptyHint": "Add columns to define what this tabular review workflow extracts from each document.",
+      "addColumnCta": "+ Add Column"
     }
   },
   "streaming": {

@@ -34,7 +34,7 @@ export const MISTRAL_LOW_MODELS = ["mistral-small-latest"] as const;
 // for self-hosters but no longer steals the slot when a Claude key is present
 // (resolveDefaultMainModel handles that priority).
 export const DEFAULT_MAIN_MODEL = "claude-sonnet-4-6";
-export const DEFAULT_TITLE_MODEL = "localllm-lite";
+export const DEFAULT_TITLE_MODEL = "claude-sonnet-4-6";
 export const DEFAULT_TABULAR_MODEL = "claude-sonnet-4-6";
 
 const ALL_MODELS = new Set<string>([

@@ -36,6 +36,7 @@ import {
 import { ApiKeyMissingModal } from "../shared/ApiKeyMissingModal";
 import { PreResponseWrapper } from "../shared/PreResponseWrapper";
 import { useUserProfile } from "@/contexts/UserProfileContext";
+import { useTranslations } from "next-intl";
 import {
     getModelProvider,
     isModelAvailable,
@@ -248,12 +249,28 @@ function TRAssistantMessage({
     const events = msg.events ?? [];
 
     // Group consecutive non-content events together so they share a single
-    // PreResponseWrapper. Content events render between wrappers.
+    // PreResponseWrapper. Content events render between wrappers — except for
+    // tiny streaming fragments (<25 chars of preprocessed text) that appear
+    // mid-thinking; those are dropped so two reasoning blocks merge into one
+    // "Završeno u N koraku" wrapper instead of flashing the user with a
+    // half-word like "Odmah pr" between two identical headers.
+    const TINY_CONTENT_MAX = 25;
     const groups: TREventGroup[] = [];
     {
         let current: Extract<TREventGroup, { kind: "pre" }> | null = null;
         events.forEach((e, i) => {
             if (e.type === "content") {
+                const text = (processedTexts[i] ?? "").trim();
+                const hasMorePre = events
+                    .slice(i + 1)
+                    .some((ev) => ev.type !== "content");
+                const isTinyMidThinking =
+                    current !== null &&
+                    text.length < TINY_CONTENT_MAX &&
+                    hasMorePre;
+                if (isTinyMidThinking) {
+                    return;
+                }
                 if (current) {
                     groups.push(current);
                     current = null;
@@ -339,6 +356,35 @@ function TRAssistantMessage({
                     strong: ({ node, ...props }) => (
                         <strong className="font-semibold" {...props} />
                     ),
+                    table: ({ node, ...props }) => (
+                        <div className="my-2 overflow-x-auto">
+                            <table
+                                className="w-full border-collapse text-sm"
+                                {...props}
+                            />
+                        </div>
+                    ),
+                    thead: ({ node, ...props }) => (
+                        <thead className="bg-gray-50" {...props} />
+                    ),
+                    tbody: ({ node, ...props }) => (
+                        <tbody className="divide-y divide-gray-200" {...props} />
+                    ),
+                    tr: ({ node, ...props }) => (
+                        <tr className="border-b border-gray-200" {...props} />
+                    ),
+                    th: ({ node, ...props }) => (
+                        <th
+                            className="px-3 py-2 text-left font-semibold text-gray-700 border-b border-gray-300"
+                            {...props}
+                        />
+                    ),
+                    td: ({ node, ...props }) => (
+                        <td
+                            className="px-3 py-2 align-top text-gray-800"
+                            {...props}
+                        />
+                    ),
                     code: ({ children }) => {
                         const codeText = String(children);
                         const citMatch = codeText.match(/^§(\d+)§$/);
@@ -376,7 +422,7 @@ function TRAssistantMessage({
     );
 
     return (
-        <div className="text-gray-900 font-serif">
+        <div className="text-gray-900 font-sans">
             <TRResponseStatus isActive={!!msg.isStreaming} />
             {groups.length > 0 && (
                 <div className="flex flex-col gap-2.5">
@@ -474,6 +520,7 @@ function TRChatInput({
         };
     };
 }) {
+    const t = useTranslations("tabularReview");
     const [value, setValue] = useState("");
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -495,7 +542,7 @@ function TRChatInput({
                 <textarea
                     ref={textareaRef}
                     rows={1}
-                    placeholder="Ask a question about your documents..."
+                    placeholder={t("chatInputPlaceholder")}
                     value={value}
                     onChange={(e) => {
                         setValue(e.target.value);
@@ -553,6 +600,7 @@ function HistoryDropdown({
     currentChatId: string | null;
     onLoad: (chatId: string) => void;
 }) {
+    const t = useTranslations("tabularReview");
     const [query, setQuery] = useState("");
     const filtered = chats
         .filter((c) => c.id !== currentChatId)
@@ -568,7 +616,7 @@ function HistoryDropdown({
                 <input
                     autoFocus
                     type="text"
-                    placeholder="Search chats…"
+                    placeholder={t("chatSearchPlaceholder")}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     className="flex-1 text-xs bg-transparent outline-none placeholder:text-gray-400 text-gray-700"
@@ -579,12 +627,12 @@ function HistoryDropdown({
                     <p className="px-3 py-2 text-xs text-gray-400">
                         {chats.filter((c) => c.id !== currentChatId).length ===
                         0
-                            ? "No previous chats."
-                            : "No matches."}
+                            ? t("chatNoPrevious")
+                            : t("chatNoMatches")}
                     </p>
                 ) : (
                     filtered.map((chat) => {
-                        const label = chat.title ?? "Chat";
+                        const label = chat.title ?? t("chatDefaultTitle");
                         return (
                             <button
                                 key={chat.id}
@@ -627,6 +675,8 @@ export function TRChatPanel({
     initialChatId,
     onChatIdChange,
 }: Props) {
+    const t = useTranslations("tabularReview");
+    const tc = useTranslations("common");
     const { profile, updateModelPreference, updateReasoningEffort } =
         useUserProfile();
     const apiKeys = {
@@ -1309,7 +1359,7 @@ export function TRChatPanel({
                                     type: "content" as const,
                                     text: isAbort
                                         ? ""
-                                        : "An error occurred. Please try again.",
+                                        : t("chatErrorRetry"),
                                 },
                             ],
                         };
@@ -1375,7 +1425,7 @@ export function TRChatPanel({
                         className="min-w-0 overflow-x-hidden whitespace-nowrap scrollbar-none"
                     >
                         <span className="text-xs font-medium text-gray-700">
-                            {currentChatTitle ?? "Assistant"}
+                            {currentChatTitle ?? t("chatAssistantTitle")}
                         </span>
                     </div>
                 </div>
@@ -1383,7 +1433,7 @@ export function TRChatPanel({
                     <div ref={historyRef} className="relative">
                         <button
                             onClick={() => setHistoryOpen((v) => !v)}
-                            title="Chat history"
+                            title={t("chatHistoryTitle")}
                             className={`flex items-center justify-center h-7 w-7 rounded-md transition-colors ${historyOpen ? "text-gray-900" : "text-gray-400 hover:text-gray-700"}`}
                         >
                             <Clock className="h-3.5 w-3.5" />
@@ -1400,7 +1450,7 @@ export function TRChatPanel({
                     </div>
                     <button
                         onClick={handleNewChat}
-                        title="New chat"
+                        title={t("chatNewTitle")}
                         className="flex items-center justify-center h-7 w-7 rounded-md text-gray-400 hover:text-gray-700 transition-colors"
                     >
                         <MessageSquarePlus className="h-3.5 w-3.5" />
@@ -1408,7 +1458,7 @@ export function TRChatPanel({
                     {currentChatId && (
                         <button
                             onClick={handleDeleteChat}
-                            title="Delete chat"
+                            title={t("chatDeleteTitle")}
                             className="flex items-center justify-center h-7 w-7 rounded-md text-gray-400 hover:text-red-600 transition-colors"
                         >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -1416,7 +1466,7 @@ export function TRChatPanel({
                     )}
                     <button
                         onClick={onClose}
-                        title="Close"
+                        title={tc("close")}
                         className="flex items-center justify-center h-7 w-7 rounded-md text-gray-400 hover:text-gray-700 transition-colors"
                     >
                         <X className="h-3.5 w-3.5" />
@@ -1433,7 +1483,7 @@ export function TRChatPanel({
                     <div className="flex flex-1 flex-col items-center justify-center gap-2">
                         <MikeIcon size={24} />
                         <p className="text-sm text-gray-400 text-center">
-                            Ask a question about this tabular review.
+                            {t("chatAskAboutReview")}
                         </p>
                     </div>
                 )}
